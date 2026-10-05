@@ -1,0 +1,7 @@
+# Copyright (c) 2026 The TOTEM ZMK Contributors
+# SPDX-License-Identifier: MIT
+
+config ZMK_KEYBEACON
+    bool "KeyBeacon: expose keyboard status (layer+mods) over a custom GATT characteristic"
+    depends on ZMK_BLE
+    default n
