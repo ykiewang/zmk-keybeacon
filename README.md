@@ -17,6 +17,21 @@ symbol — **no files are copied and no shield wiring is edited**. The shared lo
 > `west.yml`" scenarios, build/flash, verify, upgrade) lives in
 > [`GETTING-STARTED.md`](./GETTING-STARTED.md).
 
+## Part of the KeyBeacon project
+
+This repo is the **firmware (producer) side** of KeyBeacon — it only reports a ZMK keyboard's state
+over BLE. The wire protocol, the desktop app that displays that state, and the conformance kit all
+live in the main project repository:
+
+| Resource | What |
+|----------|------|
+| [**KeyBeacon**](https://github.com/ykiewang/keybeacon) | Project home — the macOS app (menu-bar widget + floating panel) and overview |
+| [KeyBeacon Protocol (KBP)](https://github.com/ykiewang/keybeacon/tree/main/protocol) | The versioned wire standard this module implements |
+| [Conformance kit](https://github.com/ykiewang/keybeacon/tree/main/conformance) | Guide, checklist, and self-test tool for keyboard authors |
+| [Roadmap](https://github.com/ykiewang/keybeacon#roadmap) | Candidate metrics planned for future KBP versions (battery, connection, WPM, …) |
+
+This module implements **KBP 1.0.0** (service `AA440AA0-…`, layer + modifiers).
+
 ## What's in the module
 
 | File | Role | Edit to port? |
@@ -87,6 +102,20 @@ KeyBeacon widget）能实时显示。它以 **Zephyr 模块**形式分发：消�
 
 > **初次接入？** 分步入门指南（含"还没有 `west.yml`"与"已有 `west.yml`"两种场景、构建/烧录、
 > 验证、升级）见 [`GETTING-STARTED.md`](./GETTING-STARTED.md)。
+
+## KeyBeacon 项目的一部分
+
+本仓库是 KeyBeacon 的**固件(生产者)端**——只负责在 ZMK 键盘上通过 BLE 上报状态。线上协议、显示该
+状态的桌面应用、以及一致性套件都在主项目仓库:
+
+| 资源 | 内容 |
+|------|------|
+| [**KeyBeacon**](https://github.com/ykiewang/keybeacon) | 项目主页——macOS 应用(菜单栏小组件 + 悬浮面板)与总览 |
+| [KeyBeacon 协议(KBP)](https://github.com/ykiewang/keybeacon/tree/main/protocol) | 本模块实现的带版本线上标准 |
+| [一致性套件](https://github.com/ykiewang/keybeacon/tree/main/conformance) | 面向键盘作者的指南、清单与自测工具 |
+| [路线图](https://github.com/ykiewang/keybeacon#roadmap) | 规划中、面向未来 KBP 版本的候选指标(电量、连接、WPM……) |
+
+本模块实现 **KBP 1.0.0**(服务 `AA440AA0-…`,层 + 修饰键)。
 
 ## 模块内容
 
