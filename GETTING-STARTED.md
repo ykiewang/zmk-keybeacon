@@ -7,10 +7,10 @@ SPDX-License-Identifier: MIT
 
 **English** · [中文](#zh-gs)
 
-This guide walks you from zero to a verified KeyBeacon build for any ZMK keyboard. You will
-add the feature in under ten minutes without editing the shared kit code. The reference
-implementation is the Totem shield in `config/boards/shields/totem/`; every example below uses
-Totem so you can compare against the live code.
+This guide takes you from zero to a verified KeyBeacon build for any ZMK keyboard. KeyBeacon
+ships as a **Zephyr module** (`zmk-keybeacon`): you consume it by adding one entry to your
+zmk-config's `west.yml` and flipping one Kconfig symbol — **no files are copied and no shield
+wiring is edited**. The module's `zephyr/module.yml` auto-registers its cmake and Kconfig.
 
 ## Before you start: does your keyboard qualify?
 
@@ -25,112 +25,86 @@ If your keyboard has no central BLE role, stop here — KeyBeacon cannot be adde
 
 ---
 
-## Step 1 — Make the kit available to your shield
+## Step 1 — Add the `zmk-keybeacon` module to your `west.yml`
 
-Copy or reference `config/keybeacon_kit/` from your shield. There are two ways:
+The module's `zephyr/module.yml` declares its cmake and Kconfig entry points, so adding the
+project to `west.yml` is **all** the integration your shield needs. You do **not** add any
+`include(...)` or `rsource ...` lines.
 
-**Option A — reference in-place (recommended if the kit is already in your config tree):**
+### Scenario A — you don't have a `config/west.yml` yet
 
-The kit is already at `config/keybeacon_kit/`. Your shield only needs to reference it by relative
-path — no copying needed.
+Many zmk-config repos build via the default GitHub Actions workflow with no local manifest.
+Create `config/west.yml`:
 
-**Option B — copy the directory:**
-
-```bash
-cp -r config/keybeacon_kit/ config/boards/shields/<your-keyboard>/keybeacon_kit/
+```yaml
+manifest:
+  remotes:
+    - name: zmkfirmware
+      url-base: https://github.com/zmkfirmware
+    - name: ykiewang
+      url-base: https://github.com/ykiewang
+  projects:
+    - name: zmk
+      remote: zmkfirmware
+      revision: main
+      import: app/west.yml
+    - name: zmk-keybeacon
+      remote: ykiewang
+      revision: v1.0.0
+  self:
+    path: config
 ```
 
-All examples below use the in-place reference path (option A), matching Totem.
+The `import: app/west.yml` line inherits all of ZMK's own dependencies (Zephyr, modules), so
+you never list them by hand.
+
+### Scenario B — you already have a `config/west.yml`
+
+Add the `ykiewang` remote (if it isn't already present) and the `zmk-keybeacon` project entry;
+leave everything else untouched:
+
+```yaml
+  remotes:
+    # ... your existing remotes ...
+    - name: ykiewang
+      url-base: https://github.com/ykiewang
+  projects:
+    # ... your existing projects ...
+    - name: zmk-keybeacon
+      remote: ykiewang
+      revision: v1.0.0
+```
+
+### Pin a tag, never track a branch
+
+`revision` **MUST** be a released semver tag (e.g. `v1.0.0`), never `main`. Pinning a tag keeps
+your firmware reproducible — a module update can never silently change your build until you bump
+the tag yourself.
 
 ---
 
-## Step 2 — Wire the kit into your shield's CMakeLists.txt
+## Step 2 — Enable the feature in your keyboard's `.conf`
 
-In `config/boards/shields/<your-keyboard>/CMakeLists.txt`, add **one line** that includes the
-kit's build snippet:
-
-```cmake
-include(${CMAKE_CURRENT_LIST_DIR}/../../../keybeacon_kit/keybeacon.cmake)
-```
-
-The cmake snippet (`keybeacon.cmake`) does nothing unless all three conditions are met at build
-time: `CONFIG_ZMK_KEYBEACON`, `CONFIG_ZMK_BLE`, and `CONFIG_ZMK_SPLIT_ROLE_CENTRAL`. This means
-including it in the file is always safe — it will silently compile out for non-central and
-peripheral targets.
-
-**Totem reference** (`config/boards/shields/totem/CMakeLists.txt`):
-
-```cmake
-include(${CMAKE_CURRENT_LIST_DIR}/../../../keybeacon_kit/keybeacon.cmake)
-```
-
----
-
-## Step 3 — Expose the Kconfig symbol in your shield's Kconfig
-
-In `config/boards/shields/<your-keyboard>/Kconfig.defconfig` (or `Kconfig`), add one `rsource`
-line so the `ZMK_KEYBEACON` symbol is visible to the build:
-
-```kconfig
-rsource "../../../keybeacon_kit/Kconfig.keybeacon"
-```
-
-Place it outside any `if SHIELD_…` block so it is visible to all targets that include this
-defconfig. The symbol itself depends on `ZMK_BLE`, so it is automatically invisible on boards
-without BLE.
-
-**Totem reference** (`config/boards/shields/totem/Kconfig.defconfig`):
-
-```kconfig
-if SHIELD_TOTEM_LEFT
-
-config ZMK_KEYBOARD_NAME
-    default "TOTEM"
-
-config ZMK_SPLIT_ROLE_CENTRAL
-    default y
-
-endif
-
-if SHIELD_TOTEM_LEFT || SHIELD_TOTEM_RIGHT
-
-config ZMK_SPLIT
-    default y
-
-endif
-
-rsource "../../../keybeacon_kit/Kconfig.keybeacon"   # ← added at the end
-```
-
----
-
-## Step 4 — Enable the feature in your keyboard's .conf
-
-In the keyboard-level `.conf` that controls the **central** target, add:
+In the `.conf` that controls the **central** target, add:
 
 ```conf
 CONFIG_ZMK_KEYBEACON=y
 ```
 
-For a split keyboard, this goes in the central half's conf only. For Totem that is
-`config/totem.conf` (shared) — since `SHIELD_TOTEM_LEFT` is the only target where
-`CONFIG_ZMK_SPLIT_ROLE_CENTRAL=y`, the cmake guard ensures `keybeacon.c` links only there.
-
-If you want to be explicit, put it in the central-specific conf:
-
-```conf
-# config/totem_left.conf  (central only — the right half and settings_reset are unaffected)
-CONFIG_ZMK_KEYBEACON=y
-```
+For a split keyboard this goes in the central half's conf only. The module's cmake guard
+(`CONFIG_ZMK_KEYBEACON AND CONFIG_ZMK_BLE AND CONFIG_ZMK_SPLIT_ROLE_CENTRAL`) ensures the code
+links only for the central role; peripheral and `settings_reset` targets compile it out silently.
 
 ---
 
-## Step 5 — Build and flash
+## Step 3 — Build and flash
 
-Build both halves of your split keyboard (or the single target for a unibody). Replace
+Fetch the module first, then build both halves (or the single target for a unibody). Replace
 `<board>` and `<shield_central>` / `<shield_peripheral>` with your actual names.
 
 ```bash
+west update                                  # fetches zmk-keybeacon at the pinned tag
+
 # Split keyboard — build central (left) then peripheral (right)
 west build -d build/left  -b <board> -- -DSHIELD=<shield_central>
 west build -d build/right -b <board> -- -DSHIELD=<shield_peripheral>
@@ -140,28 +114,25 @@ west build -d build/left  -b seeeduino_xiao_ble -- -DSHIELD=totem_left
 west build -d build/right -b seeeduino_xiao_ble -- -DSHIELD=totem_right
 ```
 
-Flash by dragging the `.uf2` onto the keyboard's mass-storage device:
+Flash by dragging the `.uf2` onto the keyboard's mass-storage device (double-press reset first):
 
 ```bash
-# Put the left half into bootloader mode (double-press reset), then:
-cp build/left/zephyr/zmk.uf2 /Volumes/<LEFT_DRIVE>/
-# Repeat for right half:
+cp build/left/zephyr/zmk.uf2  /Volumes/<LEFT_DRIVE>/
 cp build/right/zephyr/zmk.uf2 /Volumes/<RIGHT_DRIVE>/
 ```
 
 The peripheral and `settings_reset` targets build cleanly without KeyBeacon — the cmake guard
-(`CONFIG_ZMK_SPLIT_ROLE_CENTRAL`) silently excludes `keybeacon.c` from those targets.
+excludes `keybeacon.c` from those targets.
 
 ---
 
-## Step 6 — Verify
+## Step 4 — Verify
 
 Connect your keyboard to the Mac, then choose one of:
 
 **Quick probe (no app install needed):**
 
 ```bash
-# From the firmware repo root
 python3 -m venv tools/.venv
 tools/.venv/bin/pip install bleak          # pulls in pyobjc on macOS
 tools/.venv/bin/python tools/probe.py
@@ -177,28 +148,38 @@ layer=1 name="NAVI" mods=0x02   ← Left Shift held
 layer=1 name="NAVI" mods=0x00
 ```
 
-**Full app verification:**
+**Full app verification:** download `BleWidget.dmg` from
+[keybeacon Releases](https://github.com/ykiewang/keybeacon/releases) and confirm the floating
+panel shows the active layer name and modifier indicators.
 
-Download `BleWidget.dmg` from [keybeacon Releases](https://github.com/ykiewang/keybeacon/releases),
-open it, and confirm the floating panel shows the active layer name and modifier indicators.
+---
 
-**Conformance tool (full per-item check):**
+## Upgrading the module
 
-```bash
-# From the keybeacon repo
-pip install pyobjc-framework-CoreBluetooth
-python3 conformance/conformance_tool.py
-# exit 0 = all required items pass
+To move to a newer KeyBeacon release, change **only** the `revision` in `west.yml`:
+
+```yaml
+    - name: zmk-keybeacon
+      remote: ykiewang
+      revision: v1.1.0   # ← the only change
 ```
+
+then run `west update && west build`. No file in your `config/`, shield `CMakeLists.txt`, or
+`Kconfig.defconfig` changes — upgrades are a one-line edit.
 
 ---
 
 ## Troubleshooting
 
+### `west update` doesn't fetch the module
+
+Confirm the `zmk-keybeacon` project entry and the `ykiewang` remote are both present in
+`west.yml`, and that `revision` names a tag that exists. Re-run `west update` after any edit.
+
 ### Keyboard not discovered by the app or probe
 
-- Confirm the keyboard is connected to the Mac as a Bluetooth HID device (appears in System
-  Settings → Bluetooth as "Connected").
+- Confirm the keyboard is connected to the Mac as a Bluetooth HID device (System Settings →
+  Bluetooth shows "Connected").
 - The keyboard stops advertising once connected — the app finds it by enumerating
   already-connected peripherals, not by scanning. A plain BLE scan will not find it.
 - Check that `CONFIG_ZMK_KEYBEACON=y` is in the **central** target's conf, not the peripheral's.
@@ -207,20 +188,14 @@ python3 conformance/conformance_tool.py
 ### Payload reads as 2 bytes, layer name is empty
 
 The snapshot always has at least 2 bytes (`layer_index` + `mods`). If `layer_name` is empty,
-your keymap layer names may not be set. In ZMK, layer names are defined in the `.keymap` file:
+your keymap layers may lack a `label`. In ZMK, layer names come from the `.keymap` file:
 
 ```dts
 / {
     keymap {
         compatible = "zmk,keymap";
-
         base_layer {
-            label = "BASE";          // ← this becomes layer_name in the payload
-            bindings = < ... >;
-        };
-
-        nav_layer {
-            label = "NAVI";
+            label = "BASE";          // ← becomes layer_name in the payload
             bindings = < ... >;
         };
     };
@@ -228,35 +203,35 @@ your keymap layer names may not be set. In ZMK, layer names are defined in the `
 ```
 
 Without a `label`, `zmk_keymap_layer_name()` returns an empty string and the payload is exactly
-2 bytes — this is valid per the protocol and the app shows `L0`, `L1`, etc. as fallback names.
+2 bytes — valid per the protocol; the app shows `L0`, `L1`, etc. as fallback names.
 
-### Constant NOTIFY traffic while keyboard is idle
+### Constant NOTIFY traffic while idle
 
 `keybeacon.c` suppresses notifications when the snapshot is unchanged — an idle keyboard must
-produce zero traffic. If you see continuous notifications, the most likely cause is a layer index
-that keeps changing (e.g. a momentary layer key held by a macro, or a faulty mod-morph). Use the
-probe to observe the raw stream and identify the source of the change.
+produce zero traffic. Continuous notifications usually mean a layer index that keeps changing
+(e.g. a momentary layer held by a macro, or a faulty mod-morph). Use the probe to find the source.
 
-### Feature compiles into the peripheral or settings_reset image
+### Feature compiles into the peripheral or `settings_reset` image
 
-The cmake guard in `keybeacon.cmake` checks all three conditions:
+The module's cmake guard checks all three conditions:
 
 ```cmake
 if(CONFIG_ZMK_KEYBEACON AND CONFIG_ZMK_BLE AND CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 ```
 
-If `keybeacon.c` appears in a peripheral build, the peripheral target has
-`CONFIG_ZMK_SPLIT_ROLE_CENTRAL=y` set — check `Kconfig.defconfig` to confirm the role assignment.
+If `keybeacon.c` appears in a peripheral build, that target has `CONFIG_ZMK_SPLIT_ROLE_CENTRAL=y`
+set — check `Kconfig.defconfig` to confirm the role assignment.
 
 ---
 
 ## What you did NOT need to edit
 
-- `keybeacon_kit/keybeacon.c` — the shared GATT logic is never changed for porting.
-- `keybeacon_kit/keybeacon.cmake` — the cmake snippet is consumed, not modified.
-- `keybeacon_kit/Kconfig.keybeacon` — the symbol declaration is sourced, not modified.
+- `keybeacon.c` — the shared GATT logic is never changed for porting.
+- Your shield's `CMakeLists.txt` — **no** `include(...)` line; the module auto-injects cmake.
+- Your shield's `Kconfig.defconfig` — **no** `rsource ...` line; the module auto-injects Kconfig.
+- No copied files at all — `west` fetches the module at the pinned tag.
 
-That's the kit design: the shared code is fixed; you only wire it in.
+That's the module design: add one `west.yml` entry + one `.conf` symbol.
 
 ---
 
@@ -266,9 +241,10 @@ That's the kit design: the shared code is fixed; you only wire it in.
 
 **English** · [中文](#zh-gs)
 
-本指南带你从零开始，为任意 ZMK 键盘完成一次经过验证的 KeyBeacon 构建。你只需接入套件，无需修改
-任何共享代码，整个过程不超过十分钟。参考实现是 `config/boards/shields/totem/` 下的 Totem shield；
-下方所有示例均使用 Totem，方便与线上代码对照。
+本指南带你从零开始，为任意 ZMK 键盘完成一次经过验证的 KeyBeacon 构建。KeyBeacon 以
+**Zephyr 模块**（`zmk-keybeacon`）形式分发：你只需在 zmk-config 的 `west.yml` 中添加一个条目，
+再打开一个 Kconfig 符号——**无需复制任何文件，也无需改动 shield 接线**。模块的
+`zephyr/module.yml` 会自动注册其 cmake 和 Kconfig。
 
 ## 开始前：你的键盘是否符合条件？
 
@@ -283,108 +259,81 @@ KeyBeacon 通过**面向主机的 BLE 连接**上报状态。需要满足两个�
 
 ---
 
-## 第 1 步 — 让 kit 对你的 shield 可用
+## 第 1 步 — 把 `zmk-keybeacon` 模块加入你的 `west.yml`
 
-从你的 shield 复制或引用 `config/keybeacon_kit/`。有两种方式：
+模块的 `zephyr/module.yml` 声明了 cmake 与 Kconfig 入口，因此把该 project 加入 `west.yml`
+就是你的 shield 所需的**全部**接入工作。你**不需要**添加任何 `include(...)` 或 `rsource ...` 行。
 
-**方式 A — 原地引用（推荐，kit 已在你的 config 树中时）：**
+### 场景 A — 你还没有 `config/west.yml`
 
-kit 已在 `config/keybeacon_kit/`，你的 shield 只需用相对路径引用，无需复制。
+很多 zmk-config 仓库使用默认 GitHub Actions 工作流构建，没有本地 manifest。新建 `config/west.yml`：
 
-**方式 B — 复制目录：**
-
-```bash
-cp -r config/keybeacon_kit/ config/boards/shields/<your-keyboard>/keybeacon_kit/
+```yaml
+manifest:
+  remotes:
+    - name: zmkfirmware
+      url-base: https://github.com/zmkfirmware
+    - name: ykiewang
+      url-base: https://github.com/ykiewang
+  projects:
+    - name: zmk
+      remote: zmkfirmware
+      revision: main
+      import: app/west.yml
+    - name: zmk-keybeacon
+      remote: ykiewang
+      revision: v1.0.0
+  self:
+    path: config
 ```
 
-下方所有示例使用原地引用路径（方式 A），与 Totem 保持一致。
+`import: app/west.yml` 会继承 ZMK 自身的所有依赖（Zephyr、modules），你无需手动罗列。
+
+### 场景 B — 你已有 `config/west.yml`
+
+添加 `ykiewang` remote（若尚未存在）和 `zmk-keybeacon` project 条目，其余保持不动：
+
+```yaml
+  remotes:
+    # ... 你现有的 remotes ...
+    - name: ykiewang
+      url-base: https://github.com/ykiewang
+  projects:
+    # ... 你现有的 projects ...
+    - name: zmk-keybeacon
+      remote: ykiewang
+      revision: v1.0.0
+```
+
+### 固定 tag，切勿跟踪分支
+
+`revision` **必须**是已发布的 semver tag（如 `v1.0.0`），绝不用 `main`。固定 tag 保证固件可复现——
+在你亲手升级 tag 之前，模块更新绝不会悄悄改变你的构建。
 
 ---
 
-## 第 2 步 — 在 shield 的 CMakeLists.txt 中接入 kit
+## 第 2 步 — 在键盘的 `.conf` 中启用特性
 
-在 `config/boards/shields/<your-keyboard>/CMakeLists.txt` 中，添加**一行**来包含 kit 的构建片段：
-
-```cmake
-include(${CMAKE_CURRENT_LIST_DIR}/../../../keybeacon_kit/keybeacon.cmake)
-```
-
-cmake 片段（`keybeacon.cmake`）在构建时只有三个条件同时满足才会生效：`CONFIG_ZMK_KEYBEACON`、
-`CONFIG_ZMK_BLE` 和 `CONFIG_ZMK_SPLIT_ROLE_CENTRAL`。因此将这一行写进文件是完全安全的——对于
-非 central 和 peripheral 目标，它会静默地编译空。
-
-**Totem 参考**（`config/boards/shields/totem/CMakeLists.txt`）：
-
-```cmake
-include(${CMAKE_CURRENT_LIST_DIR}/../../../keybeacon_kit/keybeacon.cmake)
-```
-
----
-
-## 第 3 步 — 在 shield 的 Kconfig 中暴露符号
-
-在 `config/boards/shields/<your-keyboard>/Kconfig.defconfig`（或 `Kconfig`）中，添加一行
-`rsource`，使 `ZMK_KEYBEACON` 符号对构建可见：
-
-```kconfig
-rsource "../../../keybeacon_kit/Kconfig.keybeacon"
-```
-
-将其放在所有 `if SHIELD_…` 块**外部**，使所有包含此 defconfig 的目标都能看到它。该符号本身
-`depends on ZMK_BLE`，因此在无 BLE 的板上会自动不可见。
-
-**Totem 参考**（`config/boards/shields/totem/Kconfig.defconfig`）：
-
-```kconfig
-if SHIELD_TOTEM_LEFT
-
-config ZMK_KEYBOARD_NAME
-    default "TOTEM"
-
-config ZMK_SPLIT_ROLE_CENTRAL
-    default y
-
-endif
-
-if SHIELD_TOTEM_LEFT || SHIELD_TOTEM_RIGHT
-
-config ZMK_SPLIT
-    default y
-
-endif
-
-rsource "../../../keybeacon_kit/Kconfig.keybeacon"   # ← 在末尾添加
-```
-
----
-
-## 第 4 步 — 在键盘的 .conf 中启用特性
-
-在控制 **central** 目标的键盘级 `.conf` 中，添加：
+在控制 **central** 目标的 `.conf` 中添加：
 
 ```conf
 CONFIG_ZMK_KEYBEACON=y
 ```
 
-对于分体键盘，这只加在 central 半的 conf 里。对于 Totem，放在 `config/totem.conf`（共享）
-即可——因为只有 `SHIELD_TOTEM_LEFT` 目标设置了 `CONFIG_ZMK_SPLIT_ROLE_CENTRAL=y`，cmake 守卫
-会确保 `keybeacon.c` 只链接到那个目标。
-
-如需更明确，也可放在 central 专用 conf 里：
-
-```conf
-# config/totem_left.conf（仅 central——右半与 settings_reset 不受影响）
-CONFIG_ZMK_KEYBEACON=y
-```
+分体键盘只加在 central 半的 conf 里。模块的 cmake 守卫
+（`CONFIG_ZMK_KEYBEACON AND CONFIG_ZMK_BLE AND CONFIG_ZMK_SPLIT_ROLE_CENTRAL`）确保代码仅为
+central 角色链接；peripheral 与 `settings_reset` 目标会静默编译空。
 
 ---
 
-## 第 5 步 — 构建与烧录
+## 第 3 步 — 构建与烧录
 
-分别构建分体键盘的两半（一体式键盘只构建单个目标）。将 `<board>` 和
+先拉取模块，再构建两半（一体式键盘只构建单个目标）。将 `<board>` 和
 `<shield_central>` / `<shield_peripheral>` 替换为你的实际名称。
 
 ```bash
+west update                                  # 按固定 tag 拉取 zmk-keybeacon
+
 # 分体键盘——先构建 central（左），再构建 peripheral（右）
 west build -d build/left  -b <board> -- -DSHIELD=<shield_central>
 west build -d build/right -b <board> -- -DSHIELD=<shield_peripheral>
@@ -394,28 +343,25 @@ west build -d build/left  -b seeeduino_xiao_ble -- -DSHIELD=totem_left
 west build -d build/right -b seeeduino_xiao_ble -- -DSHIELD=totem_right
 ```
 
-将键盘置于 bootloader 模式（双击 reset），把 `.uf2` 拖拽到键盘的大容量存储设备上以烧录：
+将键盘置于 bootloader 模式（双击 reset），把 `.uf2` 拖拽到大容量存储设备上烧录：
 
 ```bash
-# 左半进入 bootloader 后：
-cp build/left/zephyr/zmk.uf2 /Volumes/<LEFT_DRIVE>/
-# 右半同理：
+cp build/left/zephyr/zmk.uf2  /Volumes/<LEFT_DRIVE>/
 cp build/right/zephyr/zmk.uf2 /Volumes/<RIGHT_DRIVE>/
 ```
 
-peripheral 和 `settings_reset` 目标可正常构建，且不包含 KeyBeacon——cmake 守卫
-（`CONFIG_ZMK_SPLIT_ROLE_CENTRAL`）会将 `keybeacon.c` 静默排除在外。
+peripheral 和 `settings_reset` 目标可正常构建且不含 KeyBeacon——cmake 守卫会将 `keybeacon.c`
+排除在外。
 
 ---
 
-## 第 6 步 — 验证
+## 第 4 步 — 验证
 
-将键盘连接到 Mac，然后选择以下任一方式验证：
+将键盘连接到 Mac，然后选择以下任一方式：
 
 **快速探针（无需安装 app）：**
 
 ```bash
-# 在固件仓根目录下执行
 python3 -m venv tools/.venv
 tools/.venv/bin/pip install bleak          # macOS 上会一并安装 pyobjc
 tools/.venv/bin/python tools/probe.py
@@ -431,27 +377,36 @@ layer=1 name="NAVI" mods=0x02   ← 按住左 Shift
 layer=1 name="NAVI" mods=0x00
 ```
 
-**完整 app 验证：**
+**完整 app 验证：** 从 [keybeacon Releases](https://github.com/ykiewang/keybeacon/releases)
+下载 `BleWidget.dmg`，打开后确认悬浮窗显示当前层名称与修饰键指示器。
 
-从 [keybeacon Releases](https://github.com/ykiewang/keybeacon/releases) 下载 `BleWidget.dmg`，
-打开后确认悬浮窗显示当前层名称与修饰键指示器。
+---
 
-**一致性工具（逐项全面检查）：**
+## 升级模块
 
-```bash
-# 在 keybeacon 仓目录下执行
-pip install pyobjc-framework-CoreBluetooth
-python3 conformance/conformance_tool.py
-# 退出 0 = 所有必需项通过
+要升级到新的 KeyBeacon 版本，只需改 `west.yml` 中的 `revision`：
+
+```yaml
+    - name: zmk-keybeacon
+      remote: ykiewang
+      revision: v1.1.0   # ← 唯一改动
 ```
+
+然后 `west update && west build`。你的 `config/`、shield `CMakeLists.txt`、`Kconfig.defconfig`
+中没有任何文件变化——升级就是一行改动。
 
 ---
 
 ## 排错
 
+### `west update` 没有拉取到模块
+
+确认 `west.yml` 中同时存在 `zmk-keybeacon` project 条目与 `ykiewang` remote，且 `revision`
+指向一个存在的 tag。任何改动后重跑 `west update`。
+
 ### app 或探针找不到键盘
 
-- 确认键盘已作为蓝牙 HID 设备连接到 Mac（在「系统设置 → 蓝牙」中显示为"已连接"）。
+- 确认键盘已作为蓝牙 HID 设备连接到 Mac（「系统设置 → 蓝牙」显示为"已连接"）。
 - 键盘一旦连接就会停止广播——app 通过枚举已连接外设（而非扫描广播包）来发现它。普通 BLE
   扫描不会找到它。
 - 确认 `CONFIG_ZMK_KEYBEACON=y` 在 **central** 目标的 conf 中，而非 peripheral 的。
@@ -459,53 +414,47 @@ python3 conformance/conformance_tool.py
 
 ### 载荷只有 2 字节，层名称为空
 
-快照始终至少有 2 字节（`layer_index` + `mods`）。如果 `layer_name` 为空，可能是你的 keymap
-没有设置层名称。在 ZMK 中，层名称在 `.keymap` 文件里定义：
+快照始终至少有 2 字节（`layer_index` + `mods`）。若 `layer_name` 为空，可能是你的 keymap 层
+没有设置 `label`。在 ZMK 中，层名称在 `.keymap` 文件里定义：
 
 ```dts
 / {
     keymap {
         compatible = "zmk,keymap";
-
         base_layer {
             label = "BASE";          // ← 这会成为载荷中的 layer_name
-            bindings = < ... >;
-        };
-
-        nav_layer {
-            label = "NAVI";
             bindings = < ... >;
         };
     };
 };
 ```
 
-没有 `label` 时，`zmk_keymap_layer_name()` 返回空字符串，载荷恰好为 2 字节——这在协议上是
-合法的，app 会以 `L0`、`L1` 等作为回退显示名。
+没有 `label` 时，`zmk_keymap_layer_name()` 返回空字符串，载荷恰好 2 字节——这在协议上合法，
+app 会以 `L0`、`L1` 等作为回退显示名。
 
 ### 键盘空闲时持续收到 NOTIFY
 
-`keybeacon.c` 会在快照不变时抑制通知——空闲键盘必须产生零流量。如果你看到连续通知，最可能的
-原因是层索引持续变化（例如：宏持续按住某个瞬时层按键，或 mod-morph 的缺陷）。用探针观察原始
-数据流，定位变化来源。
+`keybeacon.c` 会在快照不变时抑制通知——空闲键盘必须产生零流量。持续通知通常意味着层索引在
+持续变化（例如宏持续按住某个瞬时层按键，或 mod-morph 缺陷）。用探针观察原始数据流定位来源。
 
 ### 特性编译进了 peripheral 或 settings_reset 镜像
 
-`keybeacon.cmake` 中的 cmake 守卫检查三个条件：
+模块的 cmake 守卫检查三个条件：
 
 ```cmake
 if(CONFIG_ZMK_KEYBEACON AND CONFIG_ZMK_BLE AND CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 ```
 
-如果 `keybeacon.c` 出现在 peripheral 构建中，说明该 peripheral 目标设置了
-`CONFIG_ZMK_SPLIT_ROLE_CENTRAL=y`——检查 `Kconfig.defconfig` 确认角色分配是否正确。
+如果 `keybeacon.c` 出现在 peripheral 构建中，说明该目标设置了 `CONFIG_ZMK_SPLIT_ROLE_CENTRAL=y`
+——检查 `Kconfig.defconfig` 确认角色分配。
 
 ---
 
-## 哪些文件你不需要编辑
+## 哪些你不需要编辑
 
-- `keybeacon_kit/keybeacon.c` — 共享 GATT 逻辑，移植时永不修改。
-- `keybeacon_kit/keybeacon.cmake` — cmake 片段，被消费而非修改。
-- `keybeacon_kit/Kconfig.keybeacon` — 符号声明，被引入而非修改。
+- `keybeacon.c` — 共享 GATT 逻辑，移植时永不修改。
+- 你的 shield `CMakeLists.txt` — **没有** `include(...)` 行；模块自动注入 cmake。
+- 你的 shield `Kconfig.defconfig` — **没有** `rsource ...` 行；模块自动注入 Kconfig。
+- 完全没有复制文件——`west` 会按固定 tag 拉取模块。
 
-这就是 kit 的设计理念：共享代码固定不变，你只需接线。
+这就是模块的设计：一条 `west.yml` 条目 + 一个 `.conf` 符号。

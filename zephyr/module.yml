@@ -1,0 +1,11 @@
+# Copyright (c) 2026 The TOTEM ZMK Contributors
+# SPDX-License-Identifier: MIT
+#
+# Zephyr module manifest for KeyBeacon. Declaring the cmake and Kconfig entry
+# points here lets a consuming ZMK config pull the feature in through west.yml
+# alone — no include()/rsource wiring is needed in the shield. The feature still
+# links only for the central role (see keybeacon.cmake guards).
+name: zmk-keybeacon
+build:
+  cmake: .
+  kconfig: Kconfig.keybeacon
