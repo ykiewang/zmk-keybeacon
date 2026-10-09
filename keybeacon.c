@@ -144,7 +144,28 @@ struct peripheral_battery_slot {
 static struct peripheral_battery_slot peripheral_slots[KBP_PERIPHERAL_SLOT_COUNT];
 #endif
 
-#define KBP_PERIPHERAL_FRESH_MS 10000
+/*
+ * Peripheral freshness window (TTL) in milliseconds.
+ *
+ * This gates both:
+ *   - AA2.split_flags.right_online (bit 1): clears to 0 when the window
+ *     expires without a fresh zmk_peripheral_battery_state_changed event.
+ *   - AA3.right_percent: falls back to the unavailable sentinel (255) when
+ *     stale, since the cached value is from the previous charge cycle.
+ *
+ * ZMK's default CONFIG_ZMK_BATTERY_REPORT_INTERVAL is 60 s, meaning the
+ * peripheral BAS notify (which triggers the proxy event on the central)
+ * arrives roughly once per minute. 75 s gives a 1.25× margin so a single
+ * missed notify does not flip the online bit (jitter + occasional BLE
+ * retransmit). Keyboard authors who shorten BATTERY_REPORT_INTERVAL can
+ * leave this alone; those who lengthen it should bump this proportionally.
+ *
+ * Note: this is intentionally longer than 10 s (the value used in the
+ * initial v1.1.0 release). See CHANGELOG.md v1.1.1 and the mismatch
+ * between research.md §R1 and the actual ZMK event model (notify-based,
+ * not sync-state-based) for the rationale.
+ */
+#define KBP_PERIPHERAL_FRESH_MS 75000
 
 static inline bool kbp_peripheral_fresh(size_t slot) {
 #if KBP_PERIPHERAL_SLOT_COUNT > 0

@@ -19,6 +19,31 @@ All notable changes to the KeyBeacon Zephyr module are documented here. The modu
 Because consumers pin an exact tag, publishing a new version never affects an existing build
 until that consumer bumps its `revision`.
 
+## [1.1.1] — 2026-10-09
+
+**PATCH** release — bug fix with no wire-contract change. All KBP 1.1 bytes, UUIDs, Kconfig
+symbols, and the AA1 KBP 1.0 characteristic remain byte-for-byte identical to v1.1.0.
+
+### Fixed
+
+- **Peripheral freshness window** (`KBP_PERIPHERAL_FRESH_MS`) raised from 10 s to **75 s**. The
+  10 s value in v1.1.0 was derived from `research.md §R1` under the (incorrect) assumption
+  that the peripheral emits events on split-sync state changes. In practice the
+  `zmk_peripheral_battery_state_changed` proxy event is triggered by the standard periodic BAS
+  notify, whose default cadence is `CONFIG_ZMK_BATTERY_REPORT_INTERVAL=60 s`. With a 10 s TTL
+  the central would therefore mark the peripheral offline ~50 s out of every 60 s window even
+  on a fully healthy split keyboard; AA2.split_flags.right_online would flip to `0` and
+  AA3.right_percent would fall back to the unavailable sentinel (`255`). 75 s gives a 1.25×
+  margin on the default report interval, tolerating a single missed notify without flipping
+  the online bit. Keyboard authors who shorten `BATTERY_REPORT_INTERVAL` keep working
+  unchanged; those who lengthen it should bump this proportionally in a fork.
+
+### Documentation note
+
+`specs/002-zmk-keybeacon-kbp11/research.md §R1` and `contracts/connectivity-characteristic.md`
+in the main `keybeacon` repository will be updated in a follow-up to describe the correct
+notify-based event model.
+
 ## [1.1.0] — 2026-10-09
 
 Additive **MINOR** release implementing KBP 1.1 Connectivity + Power. Service UUID unchanged;
