@@ -5,3 +5,21 @@ config ZMK_KEYBEACON
     bool "KeyBeacon: expose keyboard status (layer+mods) over a custom GATT characteristic"
     depends on ZMK_BLE
     default n
+
+config ZMK_KEYBEACON_CONNECTIVITY
+    bool "KeyBeacon 1.1: expose Connectivity characteristic (AA440AA2-…)"
+    depends on ZMK_KEYBEACON
+    default y
+    help
+      Emit host-connection, profile, split-link, output-endpoint, and charging-flag
+      state on an additional GATT characteristic under the KeyBeacon service. See
+      KBP 1.1 §14.3 for the wire contract.
+
+config ZMK_KEYBEACON_BATTERY
+    bool "KeyBeacon 1.1: expose Battery characteristic (AA440AA3-…)"
+    depends on ZMK_KEYBEACON
+    default y
+    help
+      Emit battery percent(s) on an additional GATT characteristic. Payload is
+      1 byte overall on integer boards, 2 bytes [left, right] on splits.
+      255 = read failed / temporarily unavailable. See KBP 1.1 §14.4.
