@@ -301,7 +301,21 @@ static void batt_build_payload(uint8_t *buf) {
     buf[0] = kbp_clamp_percent(central_battery_percent);
 #if IS_ENABLED(CONFIG_ZMK_SPLIT)
 #  if KBP_PERIPHERAL_SLOT_COUNT > 0
-    if (kbp_peripheral_fresh(0)) {
+    /*
+     * Decoupled from the TTL freshness window: the Connectivity
+     * characteristic's `right_online` bit already carries the live/stale
+     * signal. The battery byte should hold the last-known reading until
+     * either (a) the module boots without ever receiving an event, or
+     * (b) the peripheral explicitly reports an unavailable sample.
+     *
+     * The previous (v1.1.1 and earlier) behaviour let the TTL expiry
+     * flip the byte to 255 on each 1 Hz tick, which — combined with the
+     * independent 1 Hz work queue for AA2 — produced a visible skew: on
+     * macOS the right-side battery number flapped between the correct
+     * percent and "—" while the online dot stayed green, because the two
+     * notifies crossed the TTL boundary at different wall-clock moments.
+     */
+    if (peripheral_slots[0].last_seen_ms > 0) {
         buf[1] = kbp_clamp_percent(peripheral_slots[0].last_percent);
     } else {
         buf[1] = 255;

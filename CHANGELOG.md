@@ -19,6 +19,27 @@ All notable changes to the KeyBeacon Zephyr module are documented here. The modu
 Because consumers pin an exact tag, publishing a new version never affects an existing build
 until that consumer bumps its `revision`.
 
+## [1.1.2] — 2026-10-09
+
+**PATCH** release — bug fix with no wire-contract change. All KBP 1.1 bytes, UUIDs, Kconfig
+symbols, and the AA1 KBP 1.0 characteristic remain byte-for-byte identical to v1.1.0 / v1.1.1.
+
+### Fixed
+
+- **AA3 `right_percent` no longer flaps between the last-known value and `255`.** Even with
+  the v1.1.1 TTL extension to 75 s, independent 1 Hz work queues for AA2 and AA3 could cross
+  the freshness boundary at slightly different wall-clock moments, producing a visible skew
+  where the floating panel showed `●R72` → `●R—` → `●R72` while the online dot stayed green.
+  The underlying design mistake was coupling the battery byte to the TTL at all: the TTL is a
+  liveness proxy and belongs on `AA2.split_flags.right_online`, not on the electrochemical
+  state-of-charge value. The battery byte should hold the last-known reading until either (a)
+  the module boots without ever receiving an event, or (b) the peripheral explicitly reports
+  an unavailable sample. v1.1.2 removes the TTL coupling in `batt_build_payload`, so the byte
+  tracks `peripheral_slots[0].last_percent` whenever `last_seen_ms > 0`.
+- A follow-up to `contracts/battery-characteristic.md §6` ("Peripheral sync-bus temporarily
+  lost: `right_percent` stays at last-known value for up to 10 s, then transitions to `255`")
+  is pending in the main `keybeacon` repository to reflect the corrected semantics.
+
 ## [1.1.1] — 2026-10-09
 
 **PATCH** release — bug fix with no wire-contract change. All KBP 1.1 bytes, UUIDs, Kconfig
