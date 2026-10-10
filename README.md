@@ -11,7 +11,7 @@ KeyBeacon exposes a ZMK keyboard's **active layer + modifier state** over a cust
 service, so a host app (e.g. the macOS KeyBeacon widget) can display it live. It ships as a
 **Zephyr module**: a consuming keyboard adds one entry to its `west.yml` and sets one Kconfig
 symbol — **no files are copied and no shield wiring is edited**. The shared logic in
-`keybeacon.c` is never modified to port the feature.
+`keybeacon.c` is never modified to add the feature.
 
 > **New here?** The step-by-step onboarding guide (both "no `west.yml` yet" and "existing
 > `west.yml`" scenarios, build/flash, verify, upgrade) lives in
@@ -53,8 +53,8 @@ to its central `.conf`.
 
 ## What's in the module
 
-| File | Role | Edit to port? |
-|------|------|---------------|
+| File | Role | Edit to integrate? |
+|------|------|--------------------|
 | `zephyr/module.yml` | Declares the cmake + Kconfig entry points to Zephyr | **No** |
 | `CMakeLists.txt` | Module cmake entry; `include()`s `keybeacon.cmake` | No |
 | `keybeacon.c` | Shared GATT logic (service, read, change-detect, notify) | **No** |
@@ -76,7 +76,7 @@ to its central `.conf`.
    ```yaml
    - name: zmk-keybeacon
      remote: ykiewang
-     revision: v1.1.0        # pin a tag, never track main
+     revision: v1.1.2        # pin a tag, never track main
    ```
 
 2. Enable it in the **central** target's `.conf`:
@@ -107,7 +107,7 @@ consumer bumps its `revision`.
 
 ## Reference consumer
 
-The Totem config (`github.com/ykiewang/zmk-config-totem`) consumes this module via its `west.yml`
+The Corne config (`github.com/ykiewang/zmk-config-corne`) consumes this module via its `west.yml`
 as the reference integration — see its `GETTING-STARTED.md` entries for the exact lines.
 
 ---
@@ -120,7 +120,7 @@ as the reference integration — see its `GETTING-STARTED.md` entries for the ex
 
 KeyBeacon 通过自定义 BLE GATT 服务暴露 ZMK 键盘的**当前层 + 修饰键状态**，使桌面应用（如 macOS
 KeyBeacon widget）能实时显示。它以 **Zephyr 模块**形式分发：消费方键盘只需在 `west.yml` 中添加
-一个条目并设置一个 Kconfig 符号——**无需复制文件，也无需改动 shield 接线**。移植时**不修改**
+一个条目并设置一个 Kconfig 符号——**无需复制文件，也无需改动 shield 接线**。接入时**不修改**
 `keybeacon.c` 中的共享逻辑。
 
 > **初次接入？** 分步入门指南（含"还没有 `west.yml`"与"已有 `west.yml`"两种场景、构建/烧录、
@@ -160,8 +160,8 @@ CCC、相同的发包节奏）；现有 KBP 1.0 主机行为不变。希望在 v
 
 ## 模块内容
 
-| 文件 | 作用 | 移植时需编辑？ |
-|------|------|--------------|
+| 文件 | 作用 | 接入时需要编辑？ |
+|------|------|----------------|
 | `zephyr/module.yml` | 向 Zephyr 声明 cmake + Kconfig 入口 | **不** |
 | `CMakeLists.txt` | 模块 cmake 入口；`include()` 调用 `keybeacon.cmake` | 不 |
 | `keybeacon.c` | 共享 GATT 逻辑（服务、读取、变化检测、通知） | **不** |
@@ -183,7 +183,7 @@ CCC、相同的发包节奏）；现有 KBP 1.0 主机行为不变。希望在 v
    ```yaml
    - name: zmk-keybeacon
      remote: ykiewang
-     revision: v1.1.0        # 固定 tag，切勿跟踪 main
+     revision: v1.1.2        # 固定 tag，切勿跟踪 main
    ```
 
 2. 在 **central** 目标的 `.conf` 中启用：
@@ -213,5 +213,5 @@ semver tag；消费方通过 `revision` 固定 tag。MAJOR/MINOR/PATCH 策略见
 
 ## 参考消费者
 
-Totem 配置（`github.com/ykiewang/zmk-config-totem`）通过其 `west.yml` 消费本模块，作为参考接入
+Corne 配置（`github.com/ykiewang/zmk-config-corne`）通过其 `west.yml` 消费本模块，作为参考接入
 ——确切条目见其 `GETTING-STARTED.md`。

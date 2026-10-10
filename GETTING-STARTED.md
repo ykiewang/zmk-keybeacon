@@ -161,7 +161,7 @@ To move to a newer KeyBeacon release, change **only** the `revision` in `west.ym
 ```yaml
     - name: zmk-keybeacon
       remote: ykiewang
-      revision: v1.1.0   # ← the only change
+      revision: v1.1.2   # ← the only change
 ```
 
 then run `west update && west build`. No file in your `config/`, shield `CMakeLists.txt`, or
@@ -226,7 +226,7 @@ set — check `Kconfig.defconfig` to confirm the role assignment.
 
 ## What you did NOT need to edit
 
-- `keybeacon.c` — the shared GATT logic is never changed for porting.
+- `keybeacon.c` — the shared GATT logic is never changed for integration.
 - Your shield's `CMakeLists.txt` — **no** `include(...)` line; the module auto-injects cmake.
 - Your shield's `Kconfig.defconfig` — **no** `rsource ...` line; the module auto-injects Kconfig.
 - No copied files at all — `west` fetches the module at the pinned tag.
@@ -389,7 +389,7 @@ layer=1 name="NAVI" mods=0x00
 ```yaml
     - name: zmk-keybeacon
       remote: ykiewang
-      revision: v1.1.0   # ← 唯一改动
+      revision: v1.1.2   # ← 唯一改动
 ```
 
 然后 `west update && west build`。你的 `config/`、shield `CMakeLists.txt`、`Kconfig.defconfig`
@@ -452,7 +452,7 @@ if(CONFIG_ZMK_KEYBEACON AND CONFIG_ZMK_BLE AND CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 
 ## 哪些你不需要编辑
 
-- `keybeacon.c` — 共享 GATT 逻辑，移植时永不修改。
+- `keybeacon.c` — 共享 GATT 逻辑，接入时永不修改。
 - 你的 shield `CMakeLists.txt` — **没有** `include(...)` 行；模块自动注入 cmake。
 - 你的 shield `Kconfig.defconfig` — **没有** `rsource ...` 行；模块自动注入 Kconfig。
 - 完全没有复制文件——`west` 会按固定 tag 拉取模块。
