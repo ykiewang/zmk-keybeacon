@@ -9,7 +9,7 @@
  *              sub-option so a v1.1.0 module can emit a v1.0-equivalent
  *              GATT shape when both sub-options are disabled.
  *
- * This file is keyboard-independent and MUST NOT be edited to port the
+ * This file is keyboard-independent and MUST NOT be edited to add the
  * feature to another keyboard — see README.md.
  */
 
@@ -140,45 +140,39 @@ static void ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value) {}
 struct peripheral_battery_slot {
     uint8_t last_percent;
     int64_t last_seen_ms;
+    bool connected;
 };
 static struct peripheral_battery_slot peripheral_slots[KBP_PERIPHERAL_SLOT_COUNT];
 #endif
 
 /*
- * Peripheral freshness window (TTL) in milliseconds.
+ * Peripheral connection state.
  *
- * This gates both:
- *   - AA2.split_flags.right_online (bit 1): clears to 0 when the window
- *     expires without a fresh zmk_peripheral_battery_state_changed event.
- *   - AA3.right_percent: falls back to the unavailable sentinel (255) when
- *     stale, since the cached value is from the previous charge cycle.
+ * `right_online` (AA2.split_flags bit 1) tracks the ACTUAL split link, not a
+ * battery-event freshness window. The battery event is only a heartbeat when
+ * the charge percentage happens to change — ZMK's battery.c raises
+ * zmk_battery_state_changed (and therefore the peripheral BAS notify proxy on
+ * the central) ONLY when `last_state_of_charge != state_of_charge` (see
+ * app/src/battery.c around the `if (last_state_of_charge != ...)` guard). On a
+ * keyboard sitting at a steady charge, that event can be tens of minutes
+ * apart, so ANY time-based TTL (10 s in v1.1.0, 75 s in v1.1.1) eventually
+ * expires and falsely reports the peripheral offline while the user is typing.
  *
- * ZMK's default CONFIG_ZMK_BATTERY_REPORT_INTERVAL is 60 s, meaning the
- * peripheral BAS notify (which triggers the proxy event on the central)
- * arrives roughly once per minute. 75 s gives a 1.25× margin so a single
- * missed notify does not flip the online bit (jitter + occasional BLE
- * retransmit). Keyboard authors who shorten BATTERY_REPORT_INTERVAL can
- * leave this alone; those who lengthen it should bump this proportionally.
+ * The reliable signals live in the ZMK central:
+ *   - On disconnect, split_central_disconnected() (central.c) raises a
+ *     zmk_peripheral_battery_state_changed with state_of_charge = 0.
+ *   - On connect, the initial BAS read/subscribe delivers the real level
+ *     (state_of_charge > 0).
+ * So `connected` is set true on any event with a real level and cleared on the
+ * 0-charge disconnect sentinel. This is event-driven and has no expiry, which
+ * is why `last_seen_ms` is now only used by the Battery characteristic (to
+ * decide whether a reading was ever received) and not by right_online.
  *
- * Note: this is intentionally longer than 10 s (the value used in the
- * initial v1.1.0 release). See CHANGELOG.md v1.1.1 and the mismatch
- * between research.md §R1 and the actual ZMK event model (notify-based,
- * not sync-state-based) for the rationale.
+ * Caveat: a peripheral that is connected but reports a genuine 0 % level is
+ * indistinguishable from the disconnect sentinel. A flat battery that still
+ * holds a BLE link is an edge case we accept; the peripheral disconnects
+ * (and re-advertises) long before it is actually at 0 %.
  */
-#define KBP_PERIPHERAL_FRESH_MS 75000
-
-static inline bool kbp_peripheral_fresh(size_t slot) {
-#if KBP_PERIPHERAL_SLOT_COUNT > 0
-    if (slot >= KBP_PERIPHERAL_SLOT_COUNT) {
-        return false;
-    }
-    return peripheral_slots[slot].last_seen_ms > 0 &&
-           (k_uptime_get() - peripheral_slots[slot].last_seen_ms) <= KBP_PERIPHERAL_FRESH_MS;
-#else
-    (void)slot;
-    return false;
-#endif
-}
 
 /* ================================================================== */
 /* AA2 Connectivity characteristic (KBP 1.1 §14.3)                     */
@@ -241,7 +235,7 @@ static void conn_build_payload(uint8_t *buf) {
 
 #if IS_ENABLED(CONFIG_ZMK_SPLIT) && IS_ENABLED(CONFIG_ZMK_SPLIT_BLE)
     split_link |= 0x01u;
-    if (kbp_peripheral_fresh(0)) {
+    if (peripheral_slots[0].connected) {
         split_link |= 0x02u;
     }
 #endif
@@ -430,8 +424,15 @@ static int conn_cb(const zmk_event_t *eh) {
     const struct zmk_peripheral_battery_state_changed *pev =
         as_zmk_peripheral_battery_state_changed(eh);
     if (pev != NULL && pev->source < KBP_PERIPHERAL_SLOT_COUNT) {
-        peripheral_slots[pev->source].last_percent = pev->state_of_charge;
-        peripheral_slots[pev->source].last_seen_ms = k_uptime_get();
+        /* ZMK raises this event with state_of_charge = 0 on disconnect and
+         * with the real level on connect/notify — see the field comment on
+         * peripheral_battery_slot. Track the link edge, not the value. */
+        bool now_connected = pev->state_of_charge > 0;
+        peripheral_slots[pev->source].connected = now_connected;
+        if (now_connected) {
+            peripheral_slots[pev->source].last_percent = pev->state_of_charge;
+            peripheral_slots[pev->source].last_seen_ms = k_uptime_get();
+        }
     }
 #endif
     conn_update_and_notify();
@@ -479,8 +480,12 @@ static int batt_cb(const zmk_event_t *eh) {
     if (pev != NULL && pev->source < KBP_PERIPHERAL_SLOT_COUNT) {
         /* Idempotent — conn_cb may have already done this; writing the same
          * values again is harmless and keeps batt_cb self-contained. */
-        peripheral_slots[pev->source].last_percent = pev->state_of_charge;
-        peripheral_slots[pev->source].last_seen_ms = k_uptime_get();
+        bool now_connected = pev->state_of_charge > 0;
+        peripheral_slots[pev->source].connected = now_connected;
+        if (now_connected) {
+            peripheral_slots[pev->source].last_percent = pev->state_of_charge;
+            peripheral_slots[pev->source].last_seen_ms = k_uptime_get();
+        }
     }
 #endif
     batt_update_and_notify(true);
