@@ -246,7 +246,7 @@ static void conn_build_payload(uint8_t *buf) {
     }
 #endif
 
-    struct zmk_endpoint_instance ep = zmk_endpoints_selected();
+    struct zmk_endpoint_instance ep = zmk_endpoint_get_selected();
     switch (ep.transport) {
     case ZMK_TRANSPORT_USB:
         output_endpoint = 1;
