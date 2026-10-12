@@ -1,0 +1,6 @@
+# Development / CI 依赖（本地跑 scripts/tests/ 和 CI validate-manifest job 共用）
+# zmk-keybeacon v1.1.4+ 的 ZMK revision compatibility contract 工具链
+
+pyyaml>=6.0
+jsonschema>=4.0
+pytest>=7.0
