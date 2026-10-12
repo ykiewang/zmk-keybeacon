@@ -1,0 +1,32 @@
+# Pre-commit hooks for zmk-keybeacon.
+#
+# Install:   pip install pre-commit && pre-commit install
+# Run once:  pre-commit run --all-files
+#
+# These hooks keep the three derived artefacts (CI workflow, README table,
+# C/K-config files) in sync with the single source of truth compatibility.yaml.
+# See specs/003-zmk-revision-pinning/.
+
+repos:
+  - repo: local
+    hooks:
+      - id: validate-compat
+        name: validate compatibility.yaml (L1/L2/L3)
+        entry: python3 scripts/validate_compat.py
+        language: system
+        pass_filenames: false
+        files: ^(compatibility\.yaml|compatibility\.schema\.yaml|Kconfig\.keybeacon|keybeacon\.c)$
+
+      - id: regen-ci-check
+        name: ensure .github/workflows/zmk-main-compat.yml is in sync
+        entry: python3 scripts/regen_ci.py --check
+        language: system
+        pass_filenames: false
+        files: ^(compatibility\.yaml|scripts/regen_ci\.py|\.github/workflows/zmk-main-compat\.yml)$
+
+      - id: update-readme-table-check
+        name: ensure README Compatibility table is in sync
+        entry: python3 scripts/update-readme-table.py --check --pending-tag v1.1.4
+        language: system
+        pass_filenames: false
+        files: ^(compatibility\.yaml|scripts/update-readme-table\.py|README\.md)$
