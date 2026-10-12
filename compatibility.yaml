@@ -62,8 +62,12 @@ ci:
     #   4dd95d7    —— renamed-era 冻结 pin（走 #ifdef 的 #else 分支）
     #   e844eca2   —— legacy-era 冻结 pin（走 #ifdef 的 #if 分支）
     zmk_refs: [main, 4dd95d7, e844eca2]
-    # 与用户现网 CI (ykiewang/zmk-config-totem) 对齐，保证实证闭环
-    shields:  [totem_left]
+    # Shield 用 ZMK upstream 自带的 corne_left（经典 split，left half 默认 central）。
+    # 不用 totem_left 因为那个 shield 定义在用户私仓 ykiewang/zmk-config-totem，
+    # CI 拉不到。compat 契约在 CMake 配置阶段就验证，shield 具体是哪个不影响
+    # keybeacon.c 的编译——只要启用 CONFIG_ZMK_KEYBEACON=y 且 shield 是 split
+    # central 即可。
+    shields:  [corne_left]
   on_schedule_failure:
     create_issue: true
     issue_label: compat-break

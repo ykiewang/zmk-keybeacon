@@ -77,6 +77,8 @@ jobs:
   build:
     needs: validate-manifest
     runs-on: ubuntu-latest
+    container:
+      image: zmkfirmware/zmk-dev-arm:3.5
     strategy:
       fail-fast: false
       matrix:
@@ -94,21 +96,32 @@ jobs:
       - name: Resolve ZMK sha
         id: zmksha
         run: echo "sha=$(git -C zmk rev-parse HEAD)" >> $GITHUB_OUTPUT
-      - uses: zmkfirmware/zmk-docker-action@v2
-        with:
-          board: xiao_ble
-          shield: ${{{{ matrix.shield }}}}
-          zephyr_version: '3.5'
-          extra_cmake_args: >
-            -DZMK_EXTRA_MODULES=${{{{ github.workspace }}}}/zmk-keybeacon
+      - name: west init + update
+        working-directory: zmk
+        run: |
+          west init -l app
+          west update --narrow -o=--depth=1
+          west zephyr-export
+      - name: west build (ZMK ref=${{{{ matrix.zmk_ref }}}}, shield=${{{{ matrix.shield }}}})
+        working-directory: zmk
+        # CONFIG_ZMK_KEYBEACON=y is required to actually link our C sources —
+        # otherwise keybeacon.cmake's zephyr_library() guard short-circuits
+        # and we never prove that keybeacon.c compiles against this ZMK ref.
+        # The compat probe runs regardless (it's at include() time, above the
+        # Kconfig guard), but we want the C-level verification too.
+        run: |
+          west build -s app -d build -b xiao_ble -- \
+            -DSHIELD=${{{{ matrix.shield }}}} \
+            -DZMK_EXTRA_MODULES=${{{{ github.workspace }}}}/zmk-keybeacon \
+            -DCONFIG_ZMK_KEYBEACON=y
       - name: Upload build log on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: build-log-${{{{ matrix.zmk_ref }}}}-${{{{ matrix.shield }}}}
           path: |
-            build/CMakeFiles/CMakeConfigureLog.yaml
-            build/zephyr/.config
+            zmk/build/CMakeFiles/CMakeConfigureLog.yaml
+            zmk/build/zephyr/.config
           retention-days: 30
 
   file-issue-on-main-break:
