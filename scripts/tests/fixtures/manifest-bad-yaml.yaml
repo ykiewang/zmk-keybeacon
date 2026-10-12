@@ -1,0 +1,5 @@
+# Intentionally broken: unterminated string triggers yaml.YAMLError -> exit 3
+module_version: "1.1.4
+zmk_known_good:
+  lower: e844eca2
+  upper: 4dd95d7

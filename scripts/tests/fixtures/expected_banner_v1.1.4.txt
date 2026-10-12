@@ -1,0 +1,37 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║  zmk-keybeacon 1.1.4 is INCOMPATIBLE with the current ZMK revision   ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+Current ZMK:    702fc69  (/Users/wangyuting19/kbd/keybeacon/zmk-keybeacon/scripts/tests/fixtures/zmk-missing)
+Known-good:    [e844eca2 .. 4dd95d7]  (as of zmk-keybeacon 1.1.4 release)
+
+Missing symbol: zmk_endpoints_selected
+  Location expected:  /Users/wangyuting19/kbd/keybeacon/zmk-keybeacon/scripts/tests/fixtures/zmk-missing/app/include/zmk/endpoints.h
+  Called from:        keybeacon.c
+  Likely cause:       upstream ZMK renamed/removed this symbol after
+                      4dd95d7 (see ZMK main-HEAD history).
+
+─── How to fix ─────────────────────────────────────────────────────────
+
+Pick ONE of the following:
+
+[1] Pin ZMK back to a known-good revision (recommended):
+      In your zmk-config's west.yml, under `projects:` → `zmk`:
+          revision: 4dd95d7
+      Then:
+          west update && west build -p
+
+[2] Upgrade zmk-keybeacon to a tag that supports newer ZMK:
+      Check https://github.com/ykiewang/zmk-keybeacon/releases
+      for a tag released after 702fc69 landed on ZMK main.
+
+[3] Opt out of the compatibility check (NOT RECOMMENDED — build may
+    still fail with cryptic C errors, and runtime behaviour is undefined):
+      In your prj.conf / <your_shield>.conf, add:
+          CONFIG_ZMK_KEYBEACON_ALLOW_INCOMPATIBLE_ZMK=y
+
+─── Also ───────────────────────────────────────────────────────────────
+
+Please DO NOT disable individual characteristics in your .conf as a
+workaround (e.g. CONFIG_ZMK_KEYBEACON_CHAR_CONNECTIVITY=n). That path
+silently removes host-side features and masks the real issue.
