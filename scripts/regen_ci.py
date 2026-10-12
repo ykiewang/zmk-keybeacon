@@ -48,6 +48,9 @@ on:
       - scripts/check_zmk_compat.py
       - scripts/validate_compat.py
       - scripts/regen_ci.py
+      - scripts/update-readme-table.py
+      - scripts/tests/**
+      - scripts/requirements-dev.txt
       - .github/workflows/zmk-main-compat.yml
       - keybeacon.c
       - Kconfig.keybeacon
