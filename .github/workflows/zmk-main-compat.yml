@@ -26,6 +26,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # fetch-depth: 0 is required so that `scripts/update-readme-table.py`
+          # can enumerate all historical v* tags via `git for-each-ref` when
+          # the pytest suite exercises its --check mode. A shallow clone drops
+          # the pre-v1.1.4 rows and makes the check report a false drift.
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
