@@ -19,6 +19,68 @@ All notable changes to the KeyBeacon Zephyr module are documented here. The modu
 Because consumers pin an exact tag, publishing a new version never affects an existing build
 until that consumer bumps its `revision`.
 
+## [1.1.4] — unreleased
+
+**PATCH** release — ZMK API forward-compat + build-time revision compatibility contract.
+No wire-protocol change (every byte of KBP 1.1 is bit-for-bit identical with v1.1.3).
+
+### Fixed
+
+- `keybeacon.c:243` now compiles against **both** older ZMK revisions and ZMK commit
+  [`6e7e0de2`][zmk-6e7e0de2] (2026-02-12, `feat(endpoints): add "no endpoint" value (#3140)`)
+  which renamed `zmk_endpoints_selected()` → `zmk_endpoint_get_selected()`. A
+  CMake-emitted macro (`ZMK_KEYBEACON_HAS_LEGACY_ENDPOINT`) selects the branch
+  at configure time; both branches return the same `struct zmk_endpoint_instance`
+  (stable since ZMK commit `860e53b3`, 2024-03-27), so downstream logic is
+  untouched.
+
+[zmk-6e7e0de2]: https://github.com/zmkfirmware/zmk/commit/6e7e0de2
+
+### Added
+
+- `compatibility.yaml` — single source of truth declaring the module's current
+  ZMK revision window and the four public ZMK symbols it depends on.
+- `cmake/zmk_compat.cmake` + `scripts/check_zmk_compat.py` — CMake configure-time
+  symbol probe. Mismatch produces a human-readable banner naming the missing
+  symbol and three concrete fixes; the C compile is never reached.
+- `scripts/validate_compat.py` — three-layer validator (YAML syntax, JSON Schema,
+  six semantic rules) for the manifest itself.
+- `scripts/regen_ci.py` + `.github/workflows/zmk-main-compat.yml` — daily ZMK
+  main-HEAD compat matrix (`main` + two frozen pins `4dd95d7` + `e844eca2` ×
+  `totem_left` on `xiao_ble`), with auto-opened GitHub issue on cron-failure
+  (dedup via label `compat-break`).
+- `scripts/update-readme-table.py` — regenerates the README Compatibility table
+  from each released tag's `compatibility.yaml`.
+- `CONFIG_ZMK_KEYBEACON_ALLOW_INCOMPATIBLE_ZMK` (default `n`) — Kconfig escape
+  hatch that downgrades the fail-fast banner to a warning. Enable only as an
+  emergency bypass; runtime behaviour is undefined when active.
+
+### Deprecated (consumer-visible)
+
+- Any `CONFIG_ZMK_KEYBEACON_CHAR_*=n` entry a consumer added to a `.conf` as a
+  workaround for the v1.1.3 compile failure can now be **removed**. Keeping it
+  silently masks the Connectivity / Battery characteristics. See the migration
+  guide in the main `keybeacon` repo:
+  [`specs/002-zmk-keybeacon-kbp11/upgrade-notes.md`][002-upgrade].
+
+### Design & provenance
+
+- Spec: [`specs/003-zmk-revision-pinning/spec.md`][003-spec] (motivation + 3 user
+  stories + 10 FR / 5 SC).
+- Investigation record (how a two-way reasoning flip led to the right root cause):
+  Clarifications § Session 2026-10-12 of the spec.
+- All 23 pytest cases + `smoke-cmake.sh` 4-section smoke green.
+
+[002-upgrade]: https://github.com/ykiewang/keybeacon/blob/main/specs/002-zmk-keybeacon-kbp11/upgrade-notes.md
+[003-spec]: https://github.com/ykiewang/keybeacon/blob/main/specs/003-zmk-revision-pinning/spec.md
+
+### Compatibility-troubleshooting
+
+If `west build` prints the "`is INCOMPATIBLE with the current ZMK revision`"
+banner, the banner itself lists three concrete fixes. The recommended fix is
+to pin ZMK to one of the two frozen revisions in the CI matrix:
+`revision: 4dd95d7` (renamed-era) or `revision: e844eca2` (legacy-era).
+
 ## [1.1.3] — 2026-10-10
 
 **PATCH** release — bug fix with no wire-contract change. All KBP 1.1 bytes, UUIDs, Kconfig
