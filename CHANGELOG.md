@@ -46,9 +46,14 @@ No wire-protocol change (every byte of KBP 1.1 is bit-for-bit identical with v1.
 - `scripts/validate_compat.py` — three-layer validator (YAML syntax, JSON Schema,
   six semantic rules) for the manifest itself.
 - `scripts/regen_ci.py` + `.github/workflows/zmk-main-compat.yml` — daily ZMK
-  main-HEAD compat matrix (`main` + two frozen pins `4dd95d7` + `e844eca2` ×
-  `totem_left` on `xiao_ble`), with auto-opened GitHub issue on cron-failure
-  (dedup via label `compat-break`).
+  symbol-probe matrix: for `main` + two frozen pins (`4dd95d7` + `e844eca2`),
+  check that every `required_symbols` entry (name **or** fallback) still
+  resolves to a header file in the ZMK clone. On cron failure the workflow
+  auto-opens a GitHub issue (dedup via label `compat-break`) so maintainers
+  see upstream API drift within 24 h instead of waiting for a user bug
+  report. The matrix is intentionally **board / shield agnostic** — this
+  module's compat guarantee is a symbol-layer contract, not an end-to-end
+  firmware build (which belongs to the consuming `zmk-config` repo).
 - `scripts/update-readme-table.py` — regenerates the README Compatibility table
   from each released tag's `compatibility.yaml`.
 - `CONFIG_ZMK_KEYBEACON_ALLOW_INCOMPATIBLE_ZMK` (default `n`) — Kconfig escape
