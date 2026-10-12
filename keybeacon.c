@@ -240,7 +240,21 @@ static void conn_build_payload(uint8_t *buf) {
     }
 #endif
 
+    /*
+     * ZMK API forward-compat (v1.1.4+):
+     *   ZMK commit 6e7e0de2 (2026-02-12, "feat(endpoints): add 'no endpoint'
+     *   value (#3140)") renamed zmk_endpoints_selected() → zmk_endpoint_get_selected().
+     *   Both names return the same struct zmk_endpoint_instance (stable since
+     *   commit 860e53b3, 2024-03-27). cmake/zmk_compat.cmake probes
+     *   app/include/zmk/endpoints.h for the legacy name and defines
+     *   ZMK_KEYBEACON_HAS_LEGACY_ENDPOINT when found. See
+     *   specs/003-zmk-revision-pinning/research.md D6 for design.
+     */
+#if defined(ZMK_KEYBEACON_HAS_LEGACY_ENDPOINT)
     struct zmk_endpoint_instance ep = zmk_endpoints_selected();
+#else
+    struct zmk_endpoint_instance ep = zmk_endpoint_get_selected();
+#endif
     switch (ep.transport) {
     case ZMK_TRANSPORT_USB:
         output_endpoint = 1;

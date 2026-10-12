@@ -2,7 +2,7 @@
 ║  zmk-keybeacon 1.1.4 is INCOMPATIBLE with the current ZMK revision   ║
 ╚══════════════════════════════════════════════════════════════════════╝
 
-Current ZMK:    702fc69  (/Users/wangyuting19/kbd/keybeacon/zmk-keybeacon/scripts/tests/fixtures/zmk-missing)
+Current ZMK:    cf5e36c  (/Users/wangyuting19/kbd/keybeacon/zmk-keybeacon/scripts/tests/fixtures/zmk-missing)
 Known-good:    [e844eca2 .. 4dd95d7]  (as of zmk-keybeacon 1.1.4 release)
 
 Missing symbol: zmk_endpoints_selected
@@ -23,7 +23,8 @@ Pick ONE of the following:
 
 [2] Upgrade zmk-keybeacon to a tag that supports newer ZMK:
       Check https://github.com/ykiewang/zmk-keybeacon/releases
-      for a tag released after 702fc69 landed on ZMK main.
+      for a tag released after your current ZMK revision landed
+      on ZMK main (see 'Current ZMK' sha above).
 
 [3] Opt out of the compatibility check (NOT RECOMMENDED — build may
     still fail with cryptic C errors, and runtime behaviour is undefined):
