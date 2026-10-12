@@ -50,7 +50,10 @@ def test_default_matrix_present_in_rendered_yaml() -> None:
     rendered = regen_ci.render(_base_compat())
     assert 'cron: "0 6 * * *"' in rendered
     assert "zmk_ref: [main, 4dd95d7, e844eca2]" in rendered
-    assert "shield:  [totem_left]" in rendered
+    # shields field is kept in schema (future per-shield build revival) but
+    # the symbol-probe CI does not consume it; it should NOT appear in the
+    # rendered workflow.
+    assert "shield:" not in rendered
     assert "fail-fast: false" in rendered
 
 
@@ -67,7 +70,10 @@ def test_custom_matrix_round_trip() -> None:
     compat["ci"]["matrix"]["shields"] = ["corne_left", "totem_left"]
     rendered = regen_ci.render(compat)
     assert "zmk_ref: [main, deadbee]" in rendered
-    assert "shield:  [corne_left, totem_left]" in rendered
+    # shields are inert in the symbol-probe CI — editing them must not
+    # affect the rendered yaml.
+    assert "corne_left" not in rendered
+    assert "totem_left" not in rendered
 
 
 def test_custom_issue_label_round_trip() -> None:
@@ -94,5 +100,24 @@ def test_defaults_when_ci_block_absent() -> None:
     rendered = regen_ci.render({"module_version": "1.1.4"})
     assert 'cron: "0 6 * * *"' in rendered
     assert "zmk_ref: [main, 4dd95d7, e844eca2]" in rendered
-    assert "shield:  [totem_left]" in rendered
+    assert "shield:" not in rendered
     assert "labels: 'compat-break'" in rendered
+
+
+def test_symbol_probe_job_shape() -> None:
+    """Guard against accidental revival of the heavy west-build matrix:
+    the generated workflow must call check_zmk_compat.py, not run a full
+    west build."""
+    rendered = regen_ci.render(_base_compat())
+    assert "symbol-probe:" in rendered
+    assert "check_zmk_compat.py" in rendered
+    # Negative checks — none of the former heavy-build infrastructure as
+    # YAML keys / shell commands. The symbol-probe comment legitimately
+    # mentions "west build" in prose so we must check for actual job
+    # artefacts, not substrings:
+    assert "image: zmkfirmware/zmk-dev-arm" not in rendered
+    assert "west init -l app" not in rendered
+    assert "west build -s app" not in rendered
+    assert "CONFIG_ZMK_KEYBEACON=y" not in rendered
+    assert "-b nice_nano_v2" not in rendered
+    assert "-b xiao_ble" not in rendered

@@ -74,16 +74,18 @@ jobs:
       - run: python3 scripts/regen_ci.py --check
       - run: python3 -m pytest scripts/tests/
 
-  build:
+  symbol-probe:
+    # feature 003 US2 本质 —— 只做 symbol 层面的 compat 检查。不跑完整
+    # west build（那是用户 config 的事，键盘种类太多，不属于本 feature）。
+    # check_zmk_compat.py 读 compatibility.yaml 的 required_symbols，在
+    # 真实 ZMK clone 的 header 里 grep 这些符号；缺失即 exit 2 + fail-fast
+    # banner，CMake 层已经复用同一个脚本。
     needs: validate-manifest
     runs-on: ubuntu-latest
-    container:
-      image: zmkfirmware/zmk-dev-arm:3.5
     strategy:
       fail-fast: false
       matrix:
         zmk_ref: {zmk_refs}
-        shield:  {shields}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -96,43 +98,19 @@ jobs:
       - name: Resolve ZMK sha
         id: zmksha
         run: echo "sha=$(git -C zmk rev-parse HEAD)" >> $GITHUB_OUTPUT
-      - name: west init + update
-        working-directory: zmk
-        run: |
-          west init -l app
-          west update --narrow -o=--depth=1
-          west zephyr-export
-      - name: west build (ZMK ref=${{{{ matrix.zmk_ref }}}}, shield=${{{{ matrix.shield }}}})
-        working-directory: zmk
-        # Notes on paths:
-        #   $GITHUB_WORKSPACE (shell env) resolves to the container-visible
-        #   path (/__w/<repo>/<repo>). The templated ${{{{ github.workspace }}}}
-        #   would resolve to the HOST path (/home/runner/...), which does not
-        #   exist inside the zmk-dev-arm container, so zephyr_module.py would
-        #   reject the dir as "not a valid zephyr module". Use $GITHUB_WORKSPACE.
-        #
-        # CONFIG_ZMK_KEYBEACON=y is required to actually link our C sources —
-        # otherwise keybeacon.cmake's zephyr_library() guard short-circuits
-        # and we never prove that keybeacon.c compiles against this ZMK ref.
-        # The compat probe runs regardless (it's at include() time, above the
-        # Kconfig guard), but we want the C-level verification too.
-        run: |
-          west build -s app -d build -b xiao_ble -- \
-            -DSHIELD=${{{{ matrix.shield }}}} \
-            -DZMK_EXTRA_MODULES="$GITHUB_WORKSPACE/zmk-keybeacon" \
-            -DCONFIG_ZMK_KEYBEACON=y
-      - name: Upload build log on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
+      - uses: actions/setup-python@v5
         with:
-          name: build-log-${{{{ matrix.zmk_ref }}}}-${{{{ matrix.shield }}}}
-          path: |
-            zmk/build/CMakeFiles/CMakeConfigureLog.yaml
-            zmk/build/zephyr/.config
-          retention-days: 30
+          python-version: '3.11'
+      - run: pip install -r zmk-keybeacon/scripts/requirements-dev.txt
+      - name: check_zmk_compat (ZMK ref=${{{{ matrix.zmk_ref }}}})
+        working-directory: zmk-keybeacon
+        run: |
+          python3 scripts/check_zmk_compat.py \
+            --compat-file compatibility.yaml \
+            --zmk-root "$GITHUB_WORKSPACE/zmk"
 
   file-issue-on-main-break:
-    needs: build
+    needs: symbol-probe
     if: failure() && github.event_name == 'schedule'
     runs-on: ubuntu-latest
     steps:
@@ -176,7 +154,11 @@ def render(compat: dict) -> str:
     schedule = ci.get("schedule", "0 6 * * *")
     matrix = ci.get("matrix", {})
     zmk_refs = matrix.get("zmk_refs", ["main", "4dd95d7", "e844eca2"])
-    shields = matrix.get("shields", ["totem_left"])
+    # NOTE: matrix.shields is parsed by validate_compat but not consumed by
+    # the generated workflow (feature 003 ships a symbol-probe CI, not a
+    # full west-build matrix; see specs/003-zmk-revision-pinning/plan.md).
+    # Kept in schema for future re-introduction of per-shield builds.
+    _ = matrix.get("shields")
     on_fail = ci.get("on_schedule_failure", {})
     issue_label = on_fail.get("issue_label", "compat-break")
 
@@ -187,7 +169,6 @@ def render(compat: dict) -> str:
     return HEADER.format(
         schedule=schedule,
         zmk_refs=_yaml_inline_list(zmk_refs),
-        shields=_yaml_inline_list(shields),
         issue_label=issue_label,
     )
 
