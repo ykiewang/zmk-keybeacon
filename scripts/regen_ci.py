@@ -104,6 +104,13 @@ jobs:
           west zephyr-export
       - name: west build (ZMK ref=${{{{ matrix.zmk_ref }}}}, shield=${{{{ matrix.shield }}}})
         working-directory: zmk
+        # Notes on paths:
+        #   $GITHUB_WORKSPACE (shell env) resolves to the container-visible
+        #   path (/__w/<repo>/<repo>). The templated ${{{{ github.workspace }}}}
+        #   would resolve to the HOST path (/home/runner/...), which does not
+        #   exist inside the zmk-dev-arm container, so zephyr_module.py would
+        #   reject the dir as "not a valid zephyr module". Use $GITHUB_WORKSPACE.
+        #
         # CONFIG_ZMK_KEYBEACON=y is required to actually link our C sources —
         # otherwise keybeacon.cmake's zephyr_library() guard short-circuits
         # and we never prove that keybeacon.c compiles against this ZMK ref.
@@ -112,7 +119,7 @@ jobs:
         run: |
           west build -s app -d build -b xiao_ble -- \
             -DSHIELD=${{{{ matrix.shield }}}} \
-            -DZMK_EXTRA_MODULES=${{{{ github.workspace }}}}/zmk-keybeacon \
+            -DZMK_EXTRA_MODULES="$GITHUB_WORKSPACE/zmk-keybeacon" \
             -DCONFIG_ZMK_KEYBEACON=y
       - name: Upload build log on failure
         if: failure()
