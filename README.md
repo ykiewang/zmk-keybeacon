@@ -5,6 +5,8 @@ SPDX-License-Identifier: MIT
 
 # zmk-keybeacon — KeyBeacon Zephyr module
 
+[![ZMK compat matrix](https://github.com/ykiewang/zmk-keybeacon/actions/workflows/zmk-main-compat.yml/badge.svg)](https://github.com/ykiewang/zmk-keybeacon/actions/workflows/zmk-main-compat.yml)
+
 **English** · [中文](#zh-kit)
 
 KeyBeacon exposes a ZMK keyboard's **active layer + modifier state** over a custom BLE GATT
@@ -61,6 +63,23 @@ to its central `.conf`.
 | `keybeacon.cmake` | Guarded `zephyr_library` snippet (symbol + BLE + central) | No |
 | `Kconfig.keybeacon` | Declares `CONFIG_ZMK_KEYBEACON` plus sub-options `CONFIG_ZMK_KEYBEACON_CONNECTIVITY` / `CONFIG_ZMK_KEYBEACON_BATTERY` (all bool; sub-options `default y`) | No |
 | `CHANGELOG.md` | Semver history + versioning policy | No |
+
+## Compatibility
+
+Each tagged release of `zmk-keybeacon` is verified against a specific window of ZMK revisions.
+The table below is **auto-generated** from each release's `compatibility.yaml` by
+`scripts/update-readme-table.py` — do not hand-edit between the markers.
+
+If your consumer firmware's `west.yml` pins ZMK to a revision outside the "known-good" window
+of your pinned `zmk-keybeacon` tag, CMake configure stops with a diagnostic banner that
+tells you exactly which symbol is missing and which three fixes are available. For details
+see [`specs/003-zmk-revision-pinning/`](https://github.com/ykiewang/keybeacon/tree/main/specs/003-zmk-revision-pinning)
+and the [`compatibility-troubleshooting`](./CHANGELOG.md#compatibility-troubleshooting) note
+in the CHANGELOG.
+
+<!-- COMPAT:BEGIN -->
+_(table populated at release time by `scripts/update-readme-table.py`)_
+<!-- COMPAT:END -->
 
 ## Prerequisites
 
