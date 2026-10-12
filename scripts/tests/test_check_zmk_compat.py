@@ -107,14 +107,21 @@ def test_banner_matches_fixture_missing() -> None:
         )
     r = _run("zmk-missing")
     assert r.returncode == 2
-    # Strip the one dynamic line "Current ZMK: <sha> (<path>)" (sha+path vary)
-    actual_lines = [
-        ln for ln in r.stderr.splitlines() if not ln.startswith("Current ZMK:")
-    ]
-    expected_lines = [
-        ln for ln in EXPECTED_BANNER.read_text(encoding="utf-8").splitlines()
-        if not ln.startswith("Current ZMK:")
-    ]
+    # Strip lines that embed an absolute path (varies per checkout) and the
+    # dynamic "Current ZMK: <sha> (<path>)" line (sha + path vary).
+    def _normalize(lines):
+        kept = []
+        for ln in lines:
+            if ln.startswith("Current ZMK:"):
+                continue
+            # "  Location expected:  <abs-path>" also carries a path.
+            if ln.lstrip().startswith("Location expected:"):
+                continue
+            kept.append(ln)
+        return kept
+
+    actual_lines = _normalize(r.stderr.splitlines())
+    expected_lines = _normalize(EXPECTED_BANNER.read_text(encoding="utf-8").splitlines())
     assert actual_lines == expected_lines, (
         "banner drift detected; diff:\n"
         + "\n".join(
