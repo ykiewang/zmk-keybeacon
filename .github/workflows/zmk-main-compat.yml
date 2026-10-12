@@ -51,7 +51,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        zmk_ref: [main, 4dd95d7, e844eca2]
+        zmk_ref: [main, 4dd95d7840eb3d5a3f59bb29fbf1ab054715ef85, e844eca2e9e3f56443b1e27d18c23144ca35b6ad]
         shield:  [corne_left]
     steps:
       - uses: actions/checkout@v4

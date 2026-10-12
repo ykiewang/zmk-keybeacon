@@ -59,9 +59,16 @@ ci:
   matrix:
     # ZMK ref 选择的理由见 specs/003-zmk-revision-pinning/research.md D7：
     #   main       —— 预警，上游继续漂移时第一时间变红
-    #   4dd95d7    —— renamed-era 冻结 pin（走 #ifdef 的 #else 分支）
-    #   e844eca2   —— legacy-era 冻结 pin（走 #ifdef 的 #if 分支）
-    zmk_refs: [main, 4dd95d7, e844eca2]
+    #   4dd95d7… —— renamed-era 冻结 pin（走 #ifdef 的 #else 分支）
+    #   e844eca2…—— legacy-era 冻结 pin（走 #ifdef 的 #if 分支）
+    # 完整 40 位 SHA：actions/checkout 若 ref 短于 40 位会把它当 branch
+    # 名解析导致 fetch 失败。known_good / banner / docs 继续用 short SHA
+    # 保持可读性，CI matrix 这一处（唯一直接喂给 git 的入口）展开为完整
+    # SHA。
+    zmk_refs:
+      - main
+      - 4dd95d7840eb3d5a3f59bb29fbf1ab054715ef85
+      - e844eca2e9e3f56443b1e27d18c23144ca35b6ad
     # Shield 用 ZMK upstream 自带的 corne_left（经典 split，left half 默认 central）。
     # 不用 totem_left 因为那个 shield 定义在用户私仓 ykiewang/zmk-config-totem，
     # CI 拉不到。compat 契约在 CMake 配置阶段就验证，shield 具体是哪个不影响
