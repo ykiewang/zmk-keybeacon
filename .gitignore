@@ -1,2 +1,5 @@
 .backup-v1.0.0/
 .DS_Store
+
+# Local README backup snapshots
+.backup-readme/

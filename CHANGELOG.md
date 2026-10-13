@@ -19,7 +19,129 @@ All notable changes to the KeyBeacon Zephyr module are documented here. The modu
 Because consumers pin an exact tag, publishing a new version never affects an existing build
 until that consumer bumps its `revision`.
 
-## [1.1.2] — 2026-10-09
+## [1.1.4] — unreleased
+
+**PATCH** release — ZMK API forward-compat + build-time revision compatibility contract.
+No wire-protocol change (every byte of KBP 1.1 is bit-for-bit identical with v1.1.3).
+
+### Fixed
+
+- `keybeacon.c:243` now compiles against **both** older ZMK revisions and ZMK commit
+  [`6e7e0de2`][zmk-6e7e0de2] (2026-02-12, `feat(endpoints): add "no endpoint" value (#3140)`)
+  which renamed `zmk_endpoints_selected()` → `zmk_endpoint_get_selected()`. A
+  CMake-emitted macro (`ZMK_KEYBEACON_HAS_LEGACY_ENDPOINT`) selects the branch
+  at configure time; both branches return the same `struct zmk_endpoint_instance`
+  (stable since ZMK commit `860e53b3`, 2024-03-27), so downstream logic is
+  untouched.
+
+[zmk-6e7e0de2]: https://github.com/zmkfirmware/zmk/commit/6e7e0de2
+
+### Added
+
+- `compatibility.yaml` — single source of truth declaring the module's current
+  ZMK revision window and the four public ZMK symbols it depends on.
+- `cmake/zmk_compat.cmake` + `scripts/check_zmk_compat.py` — CMake configure-time
+  symbol probe. Mismatch produces a human-readable banner naming the missing
+  symbol and three concrete fixes; the C compile is never reached.
+- `scripts/validate_compat.py` — three-layer validator (YAML syntax, JSON Schema,
+  six semantic rules) for the manifest itself.
+- `scripts/regen_ci.py` + `.github/workflows/zmk-main-compat.yml` — daily ZMK
+  symbol-probe matrix: for `main` + two frozen pins (`4dd95d7` + `e844eca2`),
+  check that every `required_symbols` entry (name **or** fallback) still
+  resolves to a header file in the ZMK clone. On cron failure the workflow
+  auto-opens a GitHub issue (dedup via label `compat-break`) so maintainers
+  see upstream API drift within 24 h instead of waiting for a user bug
+  report. The matrix is intentionally **board / shield agnostic** — this
+  module's compat guarantee is a symbol-layer contract, not an end-to-end
+  firmware build (which belongs to the consuming `zmk-config` repo).
+- `scripts/update-readme-table.py` — regenerates the README Compatibility table
+  from each released tag's `compatibility.yaml`.
+- `CONFIG_ZMK_KEYBEACON_ALLOW_INCOMPATIBLE_ZMK` (default `n`) — Kconfig escape
+  hatch that downgrades the fail-fast banner to a warning. Enable only as an
+  emergency bypass; runtime behaviour is undefined when active.
+
+### Deprecated (consumer-visible)
+
+- Any `CONFIG_ZMK_KEYBEACON_CHAR_*=n` entry a consumer added to a `.conf` as a
+  workaround for the v1.1.3 compile failure can now be **removed**. Keeping it
+  silently masks the Connectivity / Battery characteristics. See the migration
+  guide in the main `keybeacon` repo:
+  [`specs/002-zmk-keybeacon-kbp11/upgrade-notes.md`][002-upgrade].
+
+### Design & provenance
+
+- All 23 pytest cases + `smoke-cmake.sh` 4-section smoke green.
+
+[002-upgrade]: https://github.com/ykiewang/keybeacon/blob/main/specs/002-zmk-keybeacon-kbp11/upgrade-notes.md
+
+### Compatibility-troubleshooting
+
+If `west build` prints the "`is INCOMPATIBLE with the current ZMK revision`"
+banner, the banner itself lists three concrete fixes. The recommended fix is
+to pin ZMK to one of the two frozen revisions in the CI matrix:
+`revision: 4dd95d7` (renamed-era) or `revision: e844eca2` (legacy-era).
+
+## [1.1.3] — 2026-10-10
+
+**PATCH** release — bug fix with no wire-contract change. All KBP 1.1 bytes, UUIDs, Kconfig
+symbols, and the AA1 KBP 1.0 characteristic remain byte-for-byte identical to v1.1.0–v1.1.2.
+
+### Fixed
+
+- **`right_online` now tracks the actual BLE split link instead of a battery-event TTL.**
+  The root cause of the "right half persistently shows offline while typing" bug was that
+  `right_online` was derived from a freshness window on `zmk_peripheral_battery_state_changed`
+  events. ZMK's `battery.c` only raises that event (and therefore the peripheral BAS notify
+  proxy on the central) **when `state_of_charge` changes** — on a keyboard at a stable charge
+  the event can be tens of minutes apart, so any TTL eventually expires even while the split
+  link is fully healthy.
+
+  The reliable signal is already present in ZMK: `split_central_disconnected()` in
+  `app/src/split/bluetooth/central.c` raises `zmk_peripheral_battery_state_changed` with
+  `state_of_charge = 0` on every disconnect; the initial BAS read/subscribe after connect
+  delivers the real level (`> 0`). `peripheral_battery_slot` gains a `connected` bool that
+  is set on `state_of_charge > 0` and cleared on `state_of_charge == 0`. `right_online` now
+  reads `peripheral_slots[0].connected`, and the TTL constant `KBP_PERIPHERAL_FRESH_MS` and
+  `kbp_peripheral_fresh()` are removed entirely.
+
+  Edge-case accepted: a peripheral that is connected but genuinely at 0 % is
+  indistinguishable from the disconnect sentinel; in practice such a peripheral disconnects
+  long before its charge reaches 0 %.
+
+  `last_seen_ms` is retained solely by the Battery characteristic (`batt_build_payload`) to
+  decide whether any reading has ever been received — its meaning is unchanged for that use.
+
+---
+
+## [1.1.3] — 2026-10-10（中文）
+
+**PATCH** 版本——修复一个 bug，无线上协议变动。所有 KBP 1.1 字节、UUID、Kconfig 符号以及
+AA1（KBP 1.0）特征与 v1.1.0–v1.1.2 逐字节一致。
+
+### 修复
+
+- **`right_online` 现在追踪真实的 BLE 分体链路，而非电量事件的 TTL。**
+  "右手持续显示离线、但实际正常使用"这一问题的根因：`right_online` 依赖
+  `zmk_peripheral_battery_state_changed` 事件的新鲜度窗口。而 ZMK 的 `battery.c` 仅在
+  `state_of_charge` **发生变化时**才触发该事件（从而触发 central 上的 BAS notify 代理）——
+  电量稳定的键盘可以数十分钟不发送此事件，任何时间窗口都会在链路健在时过期。
+
+  可靠的信号已存在于 ZMK 中：`central.c` 的 `split_central_disconnected()` 在每次断连时
+  以 `state_of_charge = 0` 触发 `zmk_peripheral_battery_state_changed`；连接后的首次 BAS
+  读/订阅会返回真实电量（`> 0`）。`peripheral_battery_slot` 新增 `connected` bool：收到
+  `> 0` 置 true，收到 `0` 置 false。`right_online` 改为读取
+  `peripheral_slots[0].connected`，TTL 常量 `KBP_PERIPHERAL_FRESH_MS` 与
+  `kbp_peripheral_fresh()` 已彻底移除。
+
+  已知边界情况：真实在线但电量恰好为 0% 的 peripheral 与断连哨兵无法区分；实践中此类
+  peripheral 在电量到零前早已断连。
+
+  `last_seen_ms` 仅保留用于 Battery 特征（`batt_build_payload`）判断是否曾收到过任何读数，
+  其语义不变。
+
+---
+
+
 
 **PATCH** release — bug fix with no wire-contract change. All KBP 1.1 bytes, UUIDs, Kconfig
 symbols, and the AA1 KBP 1.0 characteristic remain byte-for-byte identical to v1.1.0 / v1.1.1.

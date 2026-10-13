@@ -23,3 +23,23 @@ config ZMK_KEYBEACON_BATTERY
       Emit battery percent(s) on an additional GATT characteristic. Payload is
       1 byte overall on integer boards, 2 bytes [left, right] on splits.
       255 = read failed / temporarily unavailable. See KBP 1.1 §14.4.
+
+config ZMK_KEYBEACON_ALLOW_INCOMPATIBLE_ZMK
+    bool "Allow building against an incompatible ZMK revision (ADVANCED)"
+    depends on ZMK_KEYBEACON
+    default n
+    help
+      When enabled, zmk-keybeacon's build-time ZMK revision compatibility
+      check (see cmake/zmk_compat.cmake and compatibility.yaml) will emit
+      a WARNING instead of a FATAL_ERROR when the installed ZMK revision
+      lacks a required internal symbol.
+
+      You almost certainly do NOT want this. The build will continue past
+      the configure stage, but will likely fail at C compile time with
+      "undefined reference" errors, and the runtime behaviour of the
+      KeyBeacon protocol service becomes undefined.
+
+      Enable this only as an emergency bypass while the maintainer
+      prepares a patched release.
+
+      Default: n  (fail-fast on incompatible ZMK revisions — recommended)

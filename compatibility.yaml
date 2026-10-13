@@ -1,0 +1,76 @@
+# compatibility.yaml — single source of truth for the ZMK revision contract.
+#
+# Consumed by:
+#   cmake/zmk_compat.cmake            (fail-fast at CMake configure time)
+#   .github/workflows/zmk-main-compat.yml (daily smoke build)
+#   scripts/update-readme-table.py    (regenerate README table on release)
+#   scripts/validate_compat.py        (CI PR check & release-time gate)
+#
+# Any change to "which ZMK revisions are supported" MUST happen here.
+# All other consumers derive from this file. Do NOT hand-edit the derived
+# artefacts (README COMPAT block, CI workflow yaml, Kconfig defaults).
+
+module_version: 1.1.4
+
+zmk_known_good:
+  # 跨 ZMK commit 6e7e0de2 ("feat(endpoints): add 'no endpoint' value (#3140)",
+  # 2026-02-12) —— 该 commit 把 zmk_endpoints_selected() 重命名为
+  # zmk_endpoint_get_selected()。本模块通过 required_symbols[0].fallback 吃
+  # 进来，所以 known_good 跨越了这个重命名事件。
+  lower: e844eca2      # legacy-era 实证 commit（zmk_endpoints_selected 存在）
+  upper: 4dd95d7       # renamed-era 实证 commit（zmk_endpoint_get_selected 存在；
+                       # 来源：ykiewang/zmk-config-totem Actions run 38043117244）
+  branch_hint: main
+
+required_symbols:
+  # keybeacon.c:243 —— 唯一跨 API 漂移点
+  - name: zmk_endpoints_selected
+    header: zmk/endpoints.h
+    used_in: keybeacon.c
+    fallback:
+      - zmk_endpoint_get_selected
+    emits_macro: ZMK_KEYBEACON_HAS_LEGACY_ENDPOINT
+
+  # keybeacon.c:218
+  - name: zmk_ble_active_profile_is_connected
+    header: zmk/ble.h
+    used_in: keybeacon.c
+
+  # keybeacon.c:222
+  - name: zmk_ble_active_profile_index
+    header: zmk/ble.h
+    used_in: keybeacon.c
+
+  # keybeacon.c:231
+  - name: zmk_ble_active_profile_is_open
+    header: zmk/ble.h
+    used_in: keybeacon.c
+
+escape_hatch:
+  kconfig: CONFIG_ZMK_KEYBEACON_ALLOW_INCOMPATIBLE_ZMK
+  default: n
+
+ci:
+  schedule: "0 6 * * *"
+  matrix:
+    # ZMK ref 的三组选择：
+    #   main       —— 预警，上游继续漂移时第一时间变红
+    #   4dd95d7… —— renamed-era 冻结 pin（走 #ifdef 的 #else 分支）
+    #   e844eca2…—— legacy-era 冻结 pin（走 #ifdef 的 #if 分支）
+    # 完整 40 位 SHA：actions/checkout 若 ref 短于 40 位会把它当 branch
+    # 名解析导致 fetch 失败。known_good / banner / docs 继续用 short SHA
+    # 保持可读性，CI matrix 这一处（唯一直接喂给 git 的入口）展开为完整
+    # SHA。
+    zmk_refs:
+      - main
+      - 4dd95d7840eb3d5a3f59bb29fbf1ab054715ef85
+      - e844eca2e9e3f56443b1e27d18c23144ca35b6ad
+    # Shield 用 ZMK upstream 自带的 corne_left（经典 split，left half 默认 central）。
+    # 不用 totem_left 因为那个 shield 定义在用户私仓 ykiewang/zmk-config-totem，
+    # CI 拉不到。compat 契约在 CMake 配置阶段就验证，shield 具体是哪个不影响
+    # keybeacon.c 的编译——只要启用 CONFIG_ZMK_KEYBEACON=y 且 shield 是 split
+    # central 即可。
+    shields:  [corne_left]
+  on_schedule_failure:
+    create_issue: true
+    issue_label: compat-break

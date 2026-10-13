@@ -1,0 +1,17 @@
+# Intentionally L3-rule-2 violating: duplicate emits_macro -> exit 5
+module_version: "1.1.4"
+zmk_known_good:
+  lower: e844eca2
+  upper: 4dd95d7
+required_symbols:
+  - name: zmk_endpoints_selected
+    header: zmk/endpoints.h
+    used_in: keybeacon.c
+    emits_macro: ZMK_KEYBEACON_HAS_LEGACY_ENDPOINT
+  - name: zmk_ble_active_profile_index
+    header: zmk/ble.h
+    used_in: keybeacon.c
+    emits_macro: ZMK_KEYBEACON_HAS_LEGACY_ENDPOINT      # <<-- duplicate macro
+escape_hatch:
+  kconfig: CONFIG_ZMK_KEYBEACON_ALLOW_INCOMPATIBLE_ZMK
+  default: n
