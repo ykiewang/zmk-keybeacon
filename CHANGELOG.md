@@ -19,7 +19,7 @@ All notable changes to the KeyBeacon Zephyr module are documented here. The modu
 Because consumers pin an exact tag, publishing a new version never affects an existing build
 until that consumer bumps its `revision`.
 
-## [1.1.4] — unreleased
+## [1.1.4] — 2026-10-13
 
 **PATCH** release — ZMK API forward-compat + build-time revision compatibility contract.
 No wire-protocol change (every byte of KBP 1.1 is bit-for-bit identical with v1.1.3).
