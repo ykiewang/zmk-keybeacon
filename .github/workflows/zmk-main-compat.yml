@@ -1,8 +1,6 @@
 # ⚠️ 此文件由 scripts/regen_ci.py 从 compatibility.yaml 派生，请勿手改。
 # To update, edit compatibility.yaml and run: python3 scripts/regen_ci.py
 # CI's validate-manifest job also runs `python3 scripts/regen_ci.py --check`.
-#
-# Contract: specs/003-zmk-revision-pinning/contracts/ci-workflow-contract.md
 
 name: ZMK main-HEAD compat matrix
 

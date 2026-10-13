@@ -18,10 +18,6 @@ Pipeline:
 
 Consumed by:
     cmake/zmk_compat.cmake   (parses stdout, surfaces banner from stderr)
-
-Contracts:
-    specs/003-zmk-revision-pinning/contracts/fail-fast-banner.md
-    specs/003-zmk-revision-pinning/contracts/compatibility-yaml-schema.md
 """
 
 from __future__ import annotations

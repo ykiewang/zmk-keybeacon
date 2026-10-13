@@ -70,14 +70,9 @@ No wire-protocol change (every byte of KBP 1.1 is bit-for-bit identical with v1.
 
 ### Design & provenance
 
-- Spec: [`specs/003-zmk-revision-pinning/spec.md`][003-spec] (motivation + 3 user
-  stories + 10 FR / 5 SC).
-- Investigation record (how a two-way reasoning flip led to the right root cause):
-  Clarifications § Session 2026-10-12 of the spec.
 - All 23 pytest cases + `smoke-cmake.sh` 4-section smoke green.
 
 [002-upgrade]: https://github.com/ykiewang/keybeacon/blob/main/specs/002-zmk-keybeacon-kbp11/upgrade-notes.md
-[003-spec]: https://github.com/ykiewang/keybeacon/blob/main/specs/003-zmk-revision-pinning/spec.md
 
 ### Compatibility-troubleshooting
 

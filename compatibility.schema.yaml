@@ -1,7 +1,5 @@
 # JSON Schema Draft 2020-12 for ../zmk-keybeacon/compatibility.yaml
-# See specs/003-zmk-revision-pinning/contracts/compatibility-yaml-schema.md
-# for the normative contract. This file is the executable copy consumed by
-# scripts/validate_compat.py (L2 schema layer).
+# Consumed by scripts/validate_compat.py (L2 schema layer).
 
 $schema: https://json-schema.org/draft/2020-12/schema
 $id: https://github.com/ykiewang/zmk-keybeacon/compatibility.schema.yaml

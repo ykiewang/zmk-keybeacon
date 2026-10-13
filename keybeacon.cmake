@@ -6,7 +6,7 @@
 # The feature links only for the central role when CONFIG_ZMK_KEYBEACON is set.
 #
 # v1.1.4+ : probe ZMK revision compatibility before compiling. See
-#           cmake/zmk_compat.cmake and specs/003-zmk-revision-pinning/.
+#           cmake/zmk_compat.cmake.
 
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/zmk_compat.cmake)
 

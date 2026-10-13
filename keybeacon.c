@@ -247,8 +247,7 @@ static void conn_build_payload(uint8_t *buf) {
      *   Both names return the same struct zmk_endpoint_instance (stable since
      *   commit 860e53b3, 2024-03-27). cmake/zmk_compat.cmake probes
      *   app/include/zmk/endpoints.h for the legacy name and defines
-     *   ZMK_KEYBEACON_HAS_LEGACY_ENDPOINT when found. See
-     *   specs/003-zmk-revision-pinning/research.md D6 for design.
+     *   ZMK_KEYBEACON_HAS_LEGACY_ENDPOINT when found.
      */
 #if defined(ZMK_KEYBEACON_HAS_LEGACY_ENDPOINT)
     struct zmk_endpoint_instance ep = zmk_endpoints_selected();

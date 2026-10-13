@@ -9,10 +9,6 @@
 # Any change to "which ZMK revisions are supported" MUST happen here.
 # All other consumers derive from this file. Do NOT hand-edit the derived
 # artefacts (README COMPAT block, CI workflow yaml, Kconfig defaults).
-#
-# See:
-#   specs/003-zmk-revision-pinning/data-model.md
-#   specs/003-zmk-revision-pinning/contracts/compatibility-yaml-schema.md
 
 module_version: 1.1.4
 
@@ -57,7 +53,7 @@ escape_hatch:
 ci:
   schedule: "0 6 * * *"
   matrix:
-    # ZMK ref 选择的理由见 specs/003-zmk-revision-pinning/research.md D7：
+    # ZMK ref 的三组选择：
     #   main       —— 预警，上游继续漂移时第一时间变红
     #   4dd95d7… —— renamed-era 冻结 pin（走 #ifdef 的 #else 分支）
     #   e844eca2…—— legacy-era 冻结 pin（走 #ifdef 的 #if 分支）

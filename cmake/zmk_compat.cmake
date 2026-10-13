@@ -6,10 +6,6 @@
 #   3. Runs check_zmk_compat.py and routes its output to the proper CMake message()
 #      level based on probe result + CONFIG_ZMK_KEYBEACON_ALLOW_INCOMPATIBLE_ZMK.
 #
-# Contract:
-#   specs/003-zmk-revision-pinning/contracts/fail-fast-banner.md
-#   specs/003-zmk-revision-pinning/contracts/escape-hatch-kconfig.md
-#
 # Output protocol (parsed from stdout line-by-line, see check_zmk_compat.py):
 #   STATUS: <one-line status for message(STATUS)>
 #   DEFINES: -DMACRO1=1 -DMACRO2=1   (empty line if none)

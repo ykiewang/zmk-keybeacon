@@ -15,8 +15,6 @@ Consumed by:
     .github/workflows/zmk-main-compat.yml  (validate-manifest job)
     Makefile / release workflow            (pre-tag check)
     pre-commit hook (optional)             (file-change guard)
-
-Contract: specs/003-zmk-revision-pinning/contracts/compatibility-yaml-schema.md
 """
 
 from __future__ import annotations

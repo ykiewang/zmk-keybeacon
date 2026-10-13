@@ -5,7 +5,6 @@
 #
 # These hooks keep the three derived artefacts (CI workflow, README table,
 # C/K-config files) in sync with the single source of truth compatibility.yaml.
-# See specs/003-zmk-revision-pinning/.
 
 repos:
   - repo: local

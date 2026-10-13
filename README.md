@@ -72,9 +72,8 @@ The table below is **auto-generated** from each release's `compatibility.yaml` b
 
 If your consumer firmware's `west.yml` pins ZMK to a revision outside the "known-good" window
 of your pinned `zmk-keybeacon` tag, CMake configure stops with a diagnostic banner that
-tells you exactly which symbol is missing and which three fixes are available. For details
-see [`specs/003-zmk-revision-pinning/`](https://github.com/ykiewang/keybeacon/tree/main/specs/003-zmk-revision-pinning)
-and the [`compatibility-troubleshooting`](./CHANGELOG.md#compatibility-troubleshooting) note
+tells you exactly which symbol is missing and which three fixes are available. See the
+[`compatibility-troubleshooting`](./CHANGELOG.md#compatibility-troubleshooting) note
 in the CHANGELOG.
 
 <!-- COMPAT:BEGIN -->

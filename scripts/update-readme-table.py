@@ -11,8 +11,6 @@ Modes:
     (default)  —  overwrite README.md in place
     --check    —  render to memory, byte-diff with on-disk file;
                   exit 1 on drift (for pre-commit / CI)
-
-Contract: specs/003-zmk-revision-pinning/data-model.md "Entity: KnownGoodRange"
 """
 
 from __future__ import annotations

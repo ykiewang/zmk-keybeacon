@@ -40,7 +40,6 @@ config ZMK_KEYBEACON_ALLOW_INCOMPATIBLE_ZMK
       KeyBeacon protocol service becomes undefined.
 
       Enable this only as an emergency bypass while the maintainer
-      prepares a patched release. See:
-        specs/003-zmk-revision-pinning/contracts/escape-hatch-kconfig.md
+      prepares a patched release.
 
       Default: n  (fail-fast on incompatible ZMK revisions — recommended)

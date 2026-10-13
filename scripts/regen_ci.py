@@ -10,8 +10,6 @@ Modes:
     --check    —  render to memory and byte-diff against the on-disk file;
                   exit 1 if drift, 0 if clean (for CI validate-manifest job
                   and pre-commit hooks)
-
-Contract: specs/003-zmk-revision-pinning/contracts/ci-workflow-contract.md
 """
 
 from __future__ import annotations
@@ -32,8 +30,6 @@ HEADER = """\
 # ⚠️ 此文件由 scripts/regen_ci.py 从 compatibility.yaml 派生，请勿手改。
 # To update, edit compatibility.yaml and run: python3 scripts/regen_ci.py
 # CI's validate-manifest job also runs `python3 scripts/regen_ci.py --check`.
-#
-# Contract: specs/003-zmk-revision-pinning/contracts/ci-workflow-contract.md
 
 name: ZMK main-HEAD compat matrix
 
@@ -156,7 +152,7 @@ def render(compat: dict) -> str:
     zmk_refs = matrix.get("zmk_refs", ["main", "4dd95d7", "e844eca2"])
     # NOTE: matrix.shields is parsed by validate_compat but not consumed by
     # the generated workflow (feature 003 ships a symbol-probe CI, not a
-    # full west-build matrix; see specs/003-zmk-revision-pinning/plan.md).
+    # full west-build matrix).
     # Kept in schema for future re-introduction of per-shield builds.
     _ = matrix.get("shields")
     on_fail = ci.get("on_schedule_failure", {})
