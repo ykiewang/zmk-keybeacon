@@ -109,6 +109,8 @@ jobs:
     needs: symbol-probe
     if: failure() && github.event_name == 'schedule'
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
     steps:
       - uses: actions/github-script@v7
         with:
