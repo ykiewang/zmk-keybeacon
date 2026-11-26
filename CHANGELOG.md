@@ -28,6 +28,20 @@ a unibody target that previously built green with **no** KeyBeacon service at al
 
 ### Fixed
 
+- `cmake/zmk_compat.cmake` — the probe's output parser silently dropped the
+  `DEFINES:` line, so `ZMK_KEYBEACON_HAS_LEGACY_ENDPOINT` never reached the compiler. It
+  split raw stdout into a CMake list (`string(REPLACE "\n" ";" …)` + `foreach(IN LISTS …)`),
+  and the STATUS line embeds unmatched `[` characters (`[zmk-keybeacon 1.2.1] … [known-good:
+  …)`); a list element holding an open bracket makes `foreach` swallow the elements after it, so
+  `STATUS:` and `DEFINES:` arrived as one item and the defines branch never matched. Invisible
+  until now because every consumer pinned a post-rename ZMK, where the `#else` branch
+  (`zmk_endpoint_get_selected()`) is the correct one; against a pre-rename ZMK such as the one
+  pinned by `zmk-config-adept`, `keybeacon.c` failed to compile. The parsing now lives in
+  `cmake/zmk_compat_parse.cmake`, which works on plain strings (no CMake lists, no
+  `string(FIND … <start>)` form that cmake 4.x rejects).
+- `scripts/tests/cmake_parse_smoke.cmake` + `scripts/tests/test_cmake_parse.py` — the parser had
+  no test at all (every existing test exercised the Python side). New `cmake -P` contract test
+  covering bracketed STATUS, empty DEFINES, the WARN block and degenerate input.
 - `keybeacon.cmake` — the role guard now reads
   `CONFIG_ZMK_KEYBEACON AND CONFIG_ZMK_BLE AND (NOT CONFIG_ZMK_SPLIT OR CONFIG_ZMK_SPLIT_ROLE_CENTRAL)`
   instead of requiring `CONFIG_ZMK_SPLIT_ROLE_CENTRAL` outright. ZMK defines that symbol only
