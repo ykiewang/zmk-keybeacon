@@ -10,7 +10,7 @@
 # All other consumers derive from this file. Do NOT hand-edit the derived
 # artefacts (README COMPAT block, CI workflow yaml, Kconfig defaults).
 
-module_version: 1.2.0
+module_version: 1.2.1
 
 zmk_known_good:
   # 跨 ZMK commit 6e7e0de2 ("feat(endpoints): add 'no endpoint' value (#3140)",

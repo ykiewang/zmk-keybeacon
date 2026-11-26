@@ -65,30 +65,15 @@ endif()
 
 # -------------------------------------------------------------------------
 # rc == 0 — parse stdout and route output to CMake message().
+# The parser lives in zmk_compat_parse.cmake: the STATUS line carries
+# unmatched '[' characters, which makes a newline->';' list split collapse
+# STATUS and DEFINES into one item and silently drops the compile defines.
 # -------------------------------------------------------------------------
-string(REPLACE "\n" ";" _compat_lines "${_compat_stdout}")
-set(_compat_status_line "")
-set(_compat_defines_line "")
-set(_compat_in_warn FALSE)
-set(_compat_warn_body "")
-
-foreach(_line IN LISTS _compat_lines)
-    if(_line MATCHES "^STATUS: (.*)$")
-        set(_compat_status_line "${CMAKE_MATCH_1}")
-        set(_compat_in_warn FALSE)
-    elseif(_line MATCHES "^DEFINES: (.*)$")
-        set(_compat_defines_line "${CMAKE_MATCH_1}")
-        set(_compat_in_warn FALSE)
-    elseif(_line STREQUAL "WARN:")
-        set(_compat_in_warn TRUE)
-    elseif(_compat_in_warn AND _line MATCHES "^  (.*)$")
-        if(_compat_warn_body)
-            set(_compat_warn_body "${_compat_warn_body}\n${CMAKE_MATCH_1}")
-        else()
-            set(_compat_warn_body "${CMAKE_MATCH_1}")
-        endif()
-    endif()
-endforeach()
+include(${CMAKE_CURRENT_LIST_DIR}/zmk_compat_parse.cmake)
+zmk_keybeacon_parse_probe_output("${_compat_stdout}"
+                                 _compat_status_line
+                                 _compat_defines_line
+                                 _compat_warn_body)
 
 # Status line (always emit)
 if(_compat_status_line)
@@ -105,7 +90,7 @@ if(_compat_defines_line)
     # DEFINES line is " -DMACRO1=1 -DMACRO2=1"; split on space, strip -D prefix.
     string(STRIP "${_compat_defines_line}" _compat_defines_line)
     if(_compat_defines_line)
-        string(REPLACE " " ";" _compat_define_items "${_compat_defines_line}")
+        separate_arguments(_compat_define_items NATIVE_COMMAND "${_compat_defines_line}")
         foreach(_item IN LISTS _compat_define_items)
             if(_item MATCHES "^-D(.+)$")
                 add_compile_definitions("${CMAKE_MATCH_1}")

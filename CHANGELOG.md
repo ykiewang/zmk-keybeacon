@@ -19,6 +19,46 @@ All notable changes to the KeyBeacon Zephyr module are documented here. The modu
 Because consumers pin an exact tag, publishing a new version never affects an existing build
 until that consumer bumps its `revision`.
 
+## [1.2.1] — 2026-11-26
+
+**PATCH** release — fixes the build guard that silently compiled KeyBeacon out of every
+**unibody** (non-split) keyboard. No GATT, payload or Kconfig change: v1.2.0 and v1.2.1 produce
+the same firmware for a split central, while v1.2.1 additionally produces a working firmware for
+a unibody target that previously built green with **no** KeyBeacon service at all.
+
+### Fixed
+
+- `cmake/zmk_compat.cmake` — the probe's output parser silently dropped the
+  `DEFINES:` line, so `ZMK_KEYBEACON_HAS_LEGACY_ENDPOINT` never reached the compiler. It
+  split raw stdout into a CMake list (`string(REPLACE "\n" ";" …)` + `foreach(IN LISTS …)`),
+  and the STATUS line embeds unmatched `[` characters (`[zmk-keybeacon 1.2.1] … [known-good:
+  …)`); a list element holding an open bracket makes `foreach` swallow the elements after it, so
+  `STATUS:` and `DEFINES:` arrived as one item and the defines branch never matched. Invisible
+  until now because every consumer pinned a post-rename ZMK, where the `#else` branch
+  (`zmk_endpoint_get_selected()`) is the correct one; against a pre-rename ZMK such as the one
+  pinned by `zmk-config-adept`, `keybeacon.c` failed to compile. The parsing now lives in
+  `cmake/zmk_compat_parse.cmake`, which works on plain strings (no CMake lists, no
+  `string(FIND … <start>)` form that cmake 4.x rejects).
+- `scripts/tests/cmake_parse_smoke.cmake` + `scripts/tests/test_cmake_parse.py` — the parser had
+  no test at all (every existing test exercised the Python side). New `cmake -P` contract test
+  covering bracketed STATUS, empty DEFINES, the WARN block and degenerate input.
+- `keybeacon.cmake` — the role guard now reads
+  `CONFIG_ZMK_KEYBEACON AND CONFIG_ZMK_BLE AND (NOT CONFIG_ZMK_SPLIT OR CONFIG_ZMK_SPLIT_ROLE_CENTRAL)`
+  instead of requiring `CONFIG_ZMK_SPLIT_ROLE_CENTRAL` outright. ZMK defines that symbol only
+  inside `if ZMK_SPLIT` (`app/src/split/Kconfig`), so on a unibody build it is undefined and the
+  old guard evaluated false — the build succeeded, the shield's Kconfig was intact, but none of
+  `keybeacon.c` was linked in, so no KeyBeacon service was ever advertised. `keybeacon.c` itself
+  was already written for this case (every split-dependent block sits behind
+  `IS_ENABLED(CONFIG_ZMK_SPLIT) ? … : …`), so only the guard needed to change. Split peripherals
+  and `settings_reset` targets are still excluded.
+- `GETTING-STARTED.md` (EN + 中文) — the "Before you start" table promised unibody support that
+  the guard did not deliver; the quoted guard and both troubleshooting entries now match the
+  actual condition.
+
+### Consumers
+
+- First known unibody consumer: `ykiewang/zmk-config-adept` (Kai Adept — XIAO BLE + PMW3610).
+
 ## [1.2.0] — 2026-11-08
 
 **MINOR** release — adds the KBP 1.2 per-connection **Host-Link** characteristic
