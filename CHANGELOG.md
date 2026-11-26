@@ -19,6 +19,32 @@ All notable changes to the KeyBeacon Zephyr module are documented here. The modu
 Because consumers pin an exact tag, publishing a new version never affects an existing build
 until that consumer bumps its `revision`.
 
+## [1.2.1] — 2026-11-26
+
+**PATCH** release — fixes the build guard that silently compiled KeyBeacon out of every
+**unibody** (non-split) keyboard. No GATT, payload or Kconfig change: v1.2.0 and v1.2.1 produce
+the same firmware for a split central, while v1.2.1 additionally produces a working firmware for
+a unibody target that previously built green with **no** KeyBeacon service at all.
+
+### Fixed
+
+- `keybeacon.cmake` — the role guard now reads
+  `CONFIG_ZMK_KEYBEACON AND CONFIG_ZMK_BLE AND (NOT CONFIG_ZMK_SPLIT OR CONFIG_ZMK_SPLIT_ROLE_CENTRAL)`
+  instead of requiring `CONFIG_ZMK_SPLIT_ROLE_CENTRAL` outright. ZMK defines that symbol only
+  inside `if ZMK_SPLIT` (`app/src/split/Kconfig`), so on a unibody build it is undefined and the
+  old guard evaluated false — the build succeeded, the shield's Kconfig was intact, but none of
+  `keybeacon.c` was linked in, so no KeyBeacon service was ever advertised. `keybeacon.c` itself
+  was already written for this case (every split-dependent block sits behind
+  `IS_ENABLED(CONFIG_ZMK_SPLIT) ? … : …`), so only the guard needed to change. Split peripherals
+  and `settings_reset` targets are still excluded.
+- `GETTING-STARTED.md` (EN + 中文) — the "Before you start" table promised unibody support that
+  the guard did not deliver; the quoted guard and both troubleshooting entries now match the
+  actual condition.
+
+### Consumers
+
+- First known unibody consumer: `ykiewang/zmk-config-adept` (Kai Adept — XIAO BLE + PMW3610).
+
 ## [1.2.0] — 2026-11-08
 
 **MINOR** release — adds the KBP 1.2 per-connection **Host-Link** characteristic

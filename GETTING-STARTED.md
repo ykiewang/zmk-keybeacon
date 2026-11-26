@@ -92,8 +92,10 @@ CONFIG_ZMK_KEYBEACON=y
 ```
 
 For a split keyboard this goes in the central half's conf only. The module's cmake guard
-(`CONFIG_ZMK_KEYBEACON AND CONFIG_ZMK_BLE AND CONFIG_ZMK_SPLIT_ROLE_CENTRAL`) ensures the code
-links only for the central role; peripheral and `settings_reset` targets compile it out silently.
+(`CONFIG_ZMK_KEYBEACON AND CONFIG_ZMK_BLE AND (NOT CONFIG_ZMK_SPLIT OR
+CONFIG_ZMK_SPLIT_ROLE_CENTRAL)`) ensures the code links only for the host-link role: unibody
+builds (no `CONFIG_ZMK_SPLIT`) link it, split peripherals and `settings_reset` targets compile it
+out silently.
 
 ---
 
@@ -216,11 +218,12 @@ produce zero traffic. Continuous notifications usually mean a layer index that k
 The module's cmake guard checks all three conditions:
 
 ```cmake
-if(CONFIG_ZMK_KEYBEACON AND CONFIG_ZMK_BLE AND CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+if(CONFIG_ZMK_KEYBEACON AND CONFIG_ZMK_BLE
+   AND (NOT CONFIG_ZMK_SPLIT OR CONFIG_ZMK_SPLIT_ROLE_CENTRAL))
 ```
 
-If `keybeacon.c` appears in a peripheral build, that target has `CONFIG_ZMK_SPLIT_ROLE_CENTRAL=y`
-set — check `Kconfig.defconfig` to confirm the role assignment.
+If `keybeacon.c` appears in a peripheral build, that target has `CONFIG_ZMK_SPLIT=y` with
+`CONFIG_ZMK_SPLIT_ROLE_CENTRAL=n` — check `Kconfig.defconfig` to confirm the role assignment.
 
 ---
 
@@ -321,8 +324,9 @@ CONFIG_ZMK_KEYBEACON=y
 ```
 
 分体键盘只加在 central 半的 conf 里。模块的 cmake 守卫
-（`CONFIG_ZMK_KEYBEACON AND CONFIG_ZMK_BLE AND CONFIG_ZMK_SPLIT_ROLE_CENTRAL`）确保代码仅为
-central 角色链接；peripheral 与 `settings_reset` 目标会静默编译空。
+（`CONFIG_ZMK_KEYBEACON AND CONFIG_ZMK_BLE AND (NOT CONFIG_ZMK_SPLIT OR
+CONFIG_ZMK_SPLIT_ROLE_CENTRAL)`）确保代码仅为 host-link 角色链接：一体式构建（未设
+`CONFIG_ZMK_SPLIT`）会链接，分体 peripheral 与 `settings_reset` 目标会静默编译空。
 
 ---
 
@@ -442,11 +446,12 @@ app 会以 `L0`、`L1` 等作为回退显示名。
 模块的 cmake 守卫检查三个条件：
 
 ```cmake
-if(CONFIG_ZMK_KEYBEACON AND CONFIG_ZMK_BLE AND CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+if(CONFIG_ZMK_KEYBEACON AND CONFIG_ZMK_BLE
+   AND (NOT CONFIG_ZMK_SPLIT OR CONFIG_ZMK_SPLIT_ROLE_CENTRAL))
 ```
 
-如果 `keybeacon.c` 出现在 peripheral 构建中，说明该目标设置了 `CONFIG_ZMK_SPLIT_ROLE_CENTRAL=y`
-——检查 `Kconfig.defconfig` 确认角色分配。
+如果 `keybeacon.c` 出现在 peripheral 构建中，说明该目标设了 `CONFIG_ZMK_SPLIT=y` 且
+`CONFIG_ZMK_SPLIT_ROLE_CENTRAL=n`——检查 `Kconfig.defconfig` 确认角色分配。
 
 ---
 
