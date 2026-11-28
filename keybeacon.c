@@ -79,6 +79,13 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
     BT_UUID_DECLARE_128(BT_UUID_128_ENCODE(0xAA440AA4, 0xF5ED, 0x4C48, 0x84A1, 0x8062D20D3D55))
 #endif
 
+#if IS_ENABLED(CONFIG_ZMK_KEYBEACON_KEYMAP)
+#define KEYBEACON_META_UUID \
+    BT_UUID_DECLARE_128(BT_UUID_128_ENCODE(0xAA440AA5, 0xF5ED, 0x4C48, 0x84A1, 0x8062D20D3D55))
+#define KEYBEACON_DATA_UUID \
+    BT_UUID_DECLARE_128(BT_UUID_128_ENCODE(0xAA440AA6, 0xF5ED, 0x4C48, 0x84A1, 0x8062D20D3D55))
+#endif
+
 /* ================================================================== */
 /* Attribute-index map (data-model §E5)                                */
 /*                                                                    */
@@ -95,6 +102,14 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 /*   The AA3 index collapses from 7→4 when AA2 is disabled so the     */
 /*   unusual Kconfig combination [KEYBEACON=y, CONNECTIVITY=n,        */
 /*   BATTERY=y] still resolves correctly.                             */
+/*                                                                    */
+/*   AA4 (HOST_LINK, READ only, no CCC): appended after AA3 when      */
+/*   HOST_LINK=y. No KBP_ATTR_AA4 macro needed (no notify).           */
+/*                                                                    */
+/*   AA5 (KeymapMeta, READ only, no CCC) and AA6 (KeymapData, READ    */
+/*   only, no CCC): appended last when KEYMAP=y, after AA4 when both  */
+/*   are enabled. Each occupies 2 attr slots (chrc decl + value).     */
+/*   No KBP_ATTR_AA5/AA6 macros needed (no notify).                   */
 /* ================================================================== */
 
 #if IS_ENABLED(CONFIG_ZMK_KEYBEACON_CONNECTIVITY)
@@ -406,6 +421,216 @@ static ssize_t link_slot_read(struct bt_conn *conn, const struct bt_gatt_attr *a
 #endif /* CONFIG_ZMK_KEYBEACON_HOST_LINK */
 
 /* ================================================================== */
+/* AA5/AA6 Keymap characteristics (KBP 1.3)                            */
+/* ================================================================== */
+
+#if IS_ENABLED(CONFIG_ZMK_KEYBEACON_KEYMAP)
+
+#include <zephyr/sys/crc.h>
+#include <zmk/physical_layouts.h>
+
+struct __packed key_entry {
+    int16_t  x;
+    int16_t  y;
+    uint8_t  w;
+    uint8_t  h;
+    int16_t  r;
+    int16_t  rx;
+    int16_t  ry;
+};
+
+struct __packed binding_entry {
+    uint8_t  behavior_id;
+    uint16_t param1;
+    uint16_t param2;
+};
+
+enum kbp_behavior_id {
+    KBP_BHV_KP           = 0x01,
+    KBP_BHV_MT           = 0x02,
+    KBP_BHV_LT           = 0x03,
+    KBP_BHV_MO           = 0x04,
+    KBP_BHV_TO           = 0x05,
+    KBP_BHV_TOG          = 0x06,
+    KBP_BHV_SL           = 0x07,
+    KBP_BHV_SK           = 0x08,
+    KBP_BHV_TRANS        = 0x09,
+    KBP_BHV_NONE         = 0x0A,
+    KBP_BHV_KEY_REPEAT   = 0x0B,
+    KBP_BHV_GRESC        = 0x0C,
+    KBP_BHV_CAPS_WORD    = 0x0D,
+    KBP_BHV_KT           = 0x0E,
+    KBP_BHV_TD           = 0x10,
+    KBP_BHV_MACRO        = 0x11,
+    KBP_BHV_MOD_MORPH    = 0x12,
+    KBP_BHV_BT           = 0x20,
+    KBP_BHV_OUT          = 0x21,
+    KBP_BHV_RESET        = 0x22,
+    KBP_BHV_BOOTLOADER   = 0x23,
+    KBP_BHV_MKP          = 0x30,
+    KBP_BHV_RGB          = 0x40,
+    KBP_BHV_BL           = 0x41,
+    KBP_BHV_EXT_POWER    = 0x42,
+    KBP_BHV_SOFT_OFF     = 0x43,
+    KBP_BHV_STUDIO_UNLOCK= 0x44,
+    KBP_BHV_UNKNOWN      = 0xFF,
+};
+
+static uint8_t  keymap_data_buf[CONFIG_ZMK_KEYBEACON_KEYMAP_MAX_BYTES];
+static uint16_t keymap_data_len;
+
+static uint8_t keymap_meta_buf[256];
+static uint8_t keymap_meta_len;
+
+static uint8_t kbp_behavior_id_from_dev(const char *dev) {
+    if (!dev) return KBP_BHV_UNKNOWN;
+    if (strstr(dev, "behavior_key_press"))       return KBP_BHV_KP;
+    if (strstr(dev, "behavior_hold_tap"))        return KBP_BHV_MT;
+    if (strstr(dev, "behavior_momentary_layer")) return KBP_BHV_MO;
+    if (strstr(dev, "behavior_to_layer"))        return KBP_BHV_TO;
+    if (strstr(dev, "behavior_toggle_layer"))    return KBP_BHV_TOG;
+    if (strstr(dev, "behavior_sticky_layer"))    return KBP_BHV_SL;
+    if (strstr(dev, "behavior_sticky_key"))      return KBP_BHV_SK;
+    if (strstr(dev, "behavior_transparent"))     return KBP_BHV_TRANS;
+    if (strstr(dev, "behavior_none"))            return KBP_BHV_NONE;
+    if (strstr(dev, "behavior_key_repeat"))      return KBP_BHV_KEY_REPEAT;
+    if (strstr(dev, "behavior_gresc"))           return KBP_BHV_GRESC;
+    if (strstr(dev, "behavior_caps_word"))       return KBP_BHV_CAPS_WORD;
+    if (strstr(dev, "behavior_key_toggle"))      return KBP_BHV_KT;
+    if (strstr(dev, "behavior_tap_dance"))       return KBP_BHV_TD;
+    if (strstr(dev, "behavior_macro"))           return KBP_BHV_MACRO;
+    if (strstr(dev, "behavior_mod_morph"))       return KBP_BHV_MOD_MORPH;
+    if (strstr(dev, "behavior_bluetooth"))       return KBP_BHV_BT;
+    if (strstr(dev, "behavior_outputs"))         return KBP_BHV_OUT;
+    if (strstr(dev, "behavior_sys_reset"))       return KBP_BHV_RESET;
+    if (strstr(dev, "behavior_bootloader"))      return KBP_BHV_BOOTLOADER;
+    if (strstr(dev, "behavior_mouse_key_press")) return KBP_BHV_MKP;
+    if (strstr(dev, "behavior_rgb_underglow"))   return KBP_BHV_RGB;
+    if (strstr(dev, "behavior_backlight"))       return KBP_BHV_BL;
+    if (strstr(dev, "behavior_ext_power"))       return KBP_BHV_EXT_POWER;
+    if (strstr(dev, "behavior_soft_off"))        return KBP_BHV_SOFT_OFF;
+    if (strstr(dev, "behavior_studio_unlock"))   return KBP_BHV_STUDIO_UNLOCK;
+    return KBP_BHV_UNKNOWN;
+}
+
+static uint16_t build_keymap_data(uint8_t *buf, uint16_t max_len) {
+    const struct zmk_physical_layout *layout = zmk_physical_layouts_get_current_selected();
+    uint8_t key_count = 0;
+    uint8_t layer_count = 0;
+
+    if (layout) {
+        key_count = layout->key_count;
+    }
+    for (zmk_keymap_layer_index_t l = 0; ; l++) {
+        zmk_keymap_layer_id_t id = zmk_keymap_layer_index_to_id(l);
+        if (id == ZMK_KEYMAP_LAYER_CHILD_OF_ID_NONE) break;
+        layer_count++;
+    }
+
+    uint16_t data_size = (uint16_t)(10u * key_count + 5u * (uint32_t)layer_count * key_count);
+    if (data_size > max_len) return 0;
+
+    uint16_t off = 0;
+
+    for (uint8_t k = 0; k < key_count; k++) {
+        struct key_entry ke;
+        if (layout && k < layout->key_count) {
+            const struct zmk_physical_layout_key_position *kp = &layout->keys[k];
+            ke.x  = (int16_t)kp->x;
+            ke.y  = (int16_t)kp->y;
+            ke.w  = (uint8_t)kp->width;
+            ke.h  = (uint8_t)kp->height;
+            ke.r  = (int16_t)kp->rotation;
+            ke.rx = (int16_t)kp->rotation_x;
+            ke.ry = (int16_t)kp->rotation_y;
+        } else {
+            ke.x  = (int16_t)(k * 100);
+            ke.y  = 0;
+            ke.w  = 10;
+            ke.h  = 10;
+            ke.r  = 0;
+            ke.rx = 0;
+            ke.ry = 0;
+        }
+        memcpy(buf + off, &ke, sizeof(ke));
+        off += (uint16_t)sizeof(ke);
+    }
+
+    for (uint8_t l = 0; l < layer_count; l++) {
+        for (uint8_t k = 0; k < key_count; k++) {
+            struct zmk_behavior_binding binding = zmk_keymap_layer_binding(l, k);
+            struct binding_entry be;
+            be.behavior_id = kbp_behavior_id_from_dev(binding.behavior_dev);
+            be.param1 = (uint16_t)binding.param1;
+            be.param2 = (uint16_t)binding.param2;
+            memcpy(buf + off, &be, sizeof(be));
+            off += (uint16_t)sizeof(be);
+        }
+    }
+
+    return off;
+}
+
+static uint8_t build_keymap_meta(uint8_t *meta_buf, const uint8_t *data_buf, uint16_t data_len) {
+    uint32_t crc = crc32_ieee(data_buf, data_len);
+    uint8_t layer_count = 0;
+    uint16_t key_count = 0;
+
+    const struct zmk_physical_layout *layout = zmk_physical_layouts_get_current_selected();
+    if (layout) {
+        key_count = layout->key_count;
+    }
+
+    for (zmk_keymap_layer_index_t l = 0; ; l++) {
+        zmk_keymap_layer_id_t id = zmk_keymap_layer_index_to_id(l);
+        if (id == ZMK_KEYMAP_LAYER_CHILD_OF_ID_NONE) break;
+        layer_count++;
+    }
+
+    meta_buf[0] = (uint8_t)(crc & 0xFF);
+    meta_buf[1] = (uint8_t)((crc >> 8) & 0xFF);
+    meta_buf[2] = (uint8_t)((crc >> 16) & 0xFF);
+    meta_buf[3] = (uint8_t)((crc >> 24) & 0xFF);
+    meta_buf[4] = layer_count;
+    meta_buf[5] = (uint8_t)(key_count & 0xFF);
+    meta_buf[6] = (uint8_t)((key_count >> 8) & 0xFF);
+
+    uint8_t off = 7;
+    for (uint8_t l = 0; l < layer_count; l++) {
+        zmk_keymap_layer_id_t id = zmk_keymap_layer_index_to_id(l);
+        const char *name = zmk_keymap_layer_name(id);
+        if (name && name[0]) {
+            uint8_t nlen = (uint8_t)strnlen(name, 32);
+            if ((uint8_t)(off + nlen + 1) > 255) break;
+            memcpy(meta_buf + off, name, nlen);
+            off += nlen;
+        }
+        if (l < (uint8_t)(layer_count - 1)) {
+            meta_buf[off++] = '\0';
+        }
+    }
+
+    return off;
+}
+
+static void build_keymap_payload(void) {
+    keymap_data_len = build_keymap_data(keymap_data_buf, CONFIG_ZMK_KEYBEACON_KEYMAP_MAX_BYTES);
+    keymap_meta_len = build_keymap_meta(keymap_meta_buf, keymap_data_buf, keymap_data_len);
+}
+
+static ssize_t read_keymap_meta(struct bt_conn *conn, const struct bt_gatt_attr *attr,
+                                void *buf, uint16_t len, uint16_t offset) {
+    return bt_gatt_attr_read(conn, attr, buf, len, offset, keymap_meta_buf, keymap_meta_len);
+}
+
+static ssize_t read_keymap_data(struct bt_conn *conn, const struct bt_gatt_attr *attr,
+                                void *buf, uint16_t len, uint16_t offset) {
+    return bt_gatt_attr_read(conn, attr, buf, len, offset, keymap_data_buf, keymap_data_len);
+}
+
+#endif /* CONFIG_ZMK_KEYBEACON_KEYMAP */
+
+/* ================================================================== */
 /* GATT service definition — all characteristics in one block.         */
 /* The AA1 BT_GATT_CHARACTERISTIC + BT_GATT_CCC lines are preserved    */
 /* byte-for-byte from v1.0.0 to guarantee FR-G1 (KBP 1.0 regression).  */
@@ -433,12 +658,20 @@ BT_GATT_SERVICE_DEFINE(keybeacon_svc,
     BT_GATT_CCC(batt_ccc_cfg_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
 #endif
 #if IS_ENABLED(CONFIG_ZMK_KEYBEACON_HOST_LINK)
-    /* AA4 appended LAST (and with no CCC) so every existing attr index —
-     * attrs[1] for AA1 notify, KBP_ATTR_AA2 / KBP_ATTR_AA3 — is unchanged. */
     BT_GATT_CHARACTERISTIC(KEYBEACON_LINK_UUID,
                            BT_GATT_CHRC_READ,
                            BT_GATT_PERM_READ,
                            link_slot_read, NULL, NULL),
+#endif
+#if IS_ENABLED(CONFIG_ZMK_KEYBEACON_KEYMAP)
+    BT_GATT_CHARACTERISTIC(KEYBEACON_META_UUID,
+                           BT_GATT_CHRC_READ,
+                           BT_GATT_PERM_READ,
+                           read_keymap_meta, NULL, NULL),
+    BT_GATT_CHARACTERISTIC(KEYBEACON_DATA_UUID,
+                           BT_GATT_CHRC_READ,
+                           BT_GATT_PERM_READ,
+                           read_keymap_data, NULL, NULL),
 #endif
 );
 
@@ -603,6 +836,9 @@ static int keybeacon_init(void) {
 #if IS_ENABLED(CONFIG_ZMK_KEYBEACON_BATTERY)
     batt_build_payload(batt_payload_cache);
     k_work_schedule(&batt_floor_work, K_SECONDS(1));
+#endif
+#if IS_ENABLED(CONFIG_ZMK_KEYBEACON_KEYMAP)
+    build_keymap_payload();
 #endif
     return 0;
 }
