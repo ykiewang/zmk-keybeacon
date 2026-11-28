@@ -52,18 +52,13 @@ required_symbols:
     used_in: keybeacon.c
 
   # keybeacon.c build_keymap_data (KBP 1.3 AA6) —— 当前选中物理布局索引
-  - name: zmk_physical_layouts_get_current_selected
+  - name: zmk_physical_layouts_get_selected
     header: zmk/physical_layouts.h
     used_in: keybeacon.c
 
   # keybeacon.c build_keymap_data (KBP 1.3 AA6) —— 按 layer/position 读取 binding
-  - name: zmk_keymap_layer_binding
+  - name: zmk_keymap_get_layer_binding_at_idx
     header: zmk/keymap.h
-    used_in: keybeacon.c
-
-  # keybeacon.c build_keymap_meta (KBP 1.3 AA5) —— CRC32 计算
-  - name: crc32_ieee
-    header: zephyr/sys/crc.h
     used_in: keybeacon.c
 
 escape_hatch:

@@ -2,7 +2,7 @@
 ║  zmk-keybeacon 1.3.0 is INCOMPATIBLE with the current ZMK revision   ║
 ╚══════════════════════════════════════════════════════════════════════╝
 
-Current ZMK:    0092c19  (/Users/wangyuting19/kbd/keybeacon/zmk-keybeacon/scripts/tests/fixtures/zmk-missing)
+Current ZMK:    940b8ad  (/Users/wangyuting19/kbd/keybeacon/zmk-keybeacon/scripts/tests/fixtures/zmk-missing)
 Known-good:    [e844eca2 .. 4dd95d7]  (as of zmk-keybeacon 1.3.0 release)
 
 Missing symbol: zmk_endpoints_selected

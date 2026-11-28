@@ -1,3 +1,4 @@
-struct zmk_physical_layout_key_position { int16_t x; int16_t y; uint8_t w; uint8_t h; };
-struct zmk_physical_layout { uint8_t key_count; const struct zmk_physical_layout_key_position *keys; };
-const struct zmk_physical_layout *zmk_physical_layouts_get_current_selected(void);
+struct zmk_key_physical_attrs { int16_t width; int16_t height; int16_t x; int16_t y; };
+struct zmk_physical_layout { const char *display_name; const struct zmk_key_physical_attrs *keys; size_t keys_len; };
+size_t zmk_physical_layouts_get_list(struct zmk_physical_layout const *const **phys_layouts);
+int zmk_physical_layouts_get_selected(void);

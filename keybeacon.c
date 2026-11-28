@@ -514,16 +514,23 @@ static uint8_t kbp_behavior_id_from_dev(const char *dev) {
 }
 
 static uint16_t build_keymap_data(uint8_t *buf, uint16_t max_len) {
-    const struct zmk_physical_layout *layout = zmk_physical_layouts_get_current_selected();
+    struct zmk_physical_layout const *const *layouts = NULL;
+    size_t layout_count = zmk_physical_layouts_get_list(&layouts);
+    int sel = zmk_physical_layouts_get_selected();
+    const struct zmk_physical_layout *layout = NULL;
+    if (sel >= 0 && (size_t)sel < layout_count && layouts) {
+        layout = layouts[sel];
+    }
+
     uint8_t key_count = 0;
     uint8_t layer_count = 0;
 
     if (layout) {
-        key_count = layout->key_count;
+        key_count = (uint8_t)layout->keys_len;
     }
     for (zmk_keymap_layer_index_t l = 0; ; l++) {
         zmk_keymap_layer_id_t id = zmk_keymap_layer_index_to_id(l);
-        if (id == ZMK_KEYMAP_LAYER_CHILD_OF_ID_NONE) break;
+        if (id == ZMK_KEYMAP_LAYER_ID_INVAL) break;
         layer_count++;
     }
 
@@ -534,15 +541,21 @@ static uint16_t build_keymap_data(uint8_t *buf, uint16_t max_len) {
 
     for (uint8_t k = 0; k < key_count; k++) {
         struct key_entry ke;
-        if (layout && k < layout->key_count) {
-            const struct zmk_physical_layout_key_position *kp = &layout->keys[k];
-            ke.x  = (int16_t)kp->x;
-            ke.y  = (int16_t)kp->y;
-            ke.w  = (uint8_t)kp->width;
-            ke.h  = (uint8_t)kp->height;
-            ke.r  = (int16_t)kp->rotation;
-            ke.rx = (int16_t)kp->rotation_x;
-            ke.ry = (int16_t)kp->rotation_y;
+        if (layout && k < layout->keys_len) {
+            const struct zmk_key_physical_attrs *kp = &layout->keys[k];
+            ke.x  = kp->x;
+            ke.y  = kp->y;
+            ke.w  = (uint8_t)(kp->width / 100);
+            ke.h  = (uint8_t)(kp->height / 100);
+#if IS_ENABLED(CONFIG_ZMK_PHYSICAL_LAYOUT_KEY_ROTATION)
+            ke.r  = kp->r;
+            ke.rx = kp->rx;
+            ke.ry = kp->ry;
+#else
+            ke.r  = 0;
+            ke.rx = 0;
+            ke.ry = 0;
+#endif
         } else {
             ke.x  = (int16_t)(k * 100);
             ke.y  = 0;
@@ -557,12 +570,20 @@ static uint16_t build_keymap_data(uint8_t *buf, uint16_t max_len) {
     }
 
     for (uint8_t l = 0; l < layer_count; l++) {
+        zmk_keymap_layer_id_t id = zmk_keymap_layer_index_to_id(l);
         for (uint8_t k = 0; k < key_count; k++) {
-            struct zmk_behavior_binding binding = zmk_keymap_layer_binding(l, k);
+            const struct zmk_behavior_binding *binding =
+                zmk_keymap_get_layer_binding_at_idx(id, k);
             struct binding_entry be;
-            be.behavior_id = kbp_behavior_id_from_dev(binding.behavior_dev);
-            be.param1 = (uint16_t)binding.param1;
-            be.param2 = (uint16_t)binding.param2;
+            if (binding) {
+                be.behavior_id = kbp_behavior_id_from_dev(binding->behavior_dev);
+                be.param1 = (uint16_t)binding->param1;
+                be.param2 = (uint16_t)binding->param2;
+            } else {
+                be.behavior_id = KBP_BHV_UNKNOWN;
+                be.param1 = 0;
+                be.param2 = 0;
+            }
             memcpy(buf + off, &be, sizeof(be));
             off += (uint16_t)sizeof(be);
         }
@@ -576,14 +597,16 @@ static uint8_t build_keymap_meta(uint8_t *meta_buf, const uint8_t *data_buf, uin
     uint8_t layer_count = 0;
     uint16_t key_count = 0;
 
-    const struct zmk_physical_layout *layout = zmk_physical_layouts_get_current_selected();
-    if (layout) {
-        key_count = layout->key_count;
+    struct zmk_physical_layout const *const *layouts = NULL;
+    size_t layout_count = zmk_physical_layouts_get_list(&layouts);
+    int sel = zmk_physical_layouts_get_selected();
+    if (sel >= 0 && (size_t)sel < layout_count && layouts) {
+        key_count = (uint16_t)layouts[sel]->keys_len;
     }
 
     for (zmk_keymap_layer_index_t l = 0; ; l++) {
         zmk_keymap_layer_id_t id = zmk_keymap_layer_index_to_id(l);
-        if (id == ZMK_KEYMAP_LAYER_CHILD_OF_ID_NONE) break;
+        if (id == ZMK_KEYMAP_LAYER_ID_INVAL) break;
         layer_count++;
     }
 
